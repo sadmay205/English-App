@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/authMiddleware'); // Fix #4
 const {
   generateQuiz,
   submitQuiz,
   getProgress,
 } = require('../controllers/quizController');
+
+// Fix #4: Tất cả routes yêu cầu đăng nhập
+router.use(protect);
 
 // GET /api/quiz/generate/:setId?type=multiple-choice|fill-blank
 router.get('/generate/:setId', generateQuiz);

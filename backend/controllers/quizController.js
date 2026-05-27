@@ -23,8 +23,8 @@ const generateQuiz = async (req, res, next) => {
     const { setId } = req.params;
     const { type = 'multiple-choice', count = 10 } = req.query;
 
-    // Verify set exists
-    const set = await VocabSet.findById(setId);
+    // Fix #5: xác minh set tồn tại VÀ thuộc về user hiện tại
+    const set = await VocabSet.findOne({ _id: setId, user: req.user._id });
     if (!set) {
       res.status(404);
       throw new Error('Không tìm thấy bộ từ vựng');
@@ -124,7 +124,9 @@ const submitQuiz = async (req, res, next) => {
       throw new Error('Thiếu thông tin cần thiết (vocabSetId hoặc listeningTaskId, quizType, score, totalQuestions)');
     }
 
+    // Fix #5: lưu user vào progress record
     const progress = await Progress.create({
+      user: req.user._id,
       vocabSetId: vocabSetId || null,
       listeningTaskId: listeningTaskId || null,
       quizType,
@@ -134,7 +136,10 @@ const submitQuiz = async (req, res, next) => {
 
     // Update lastStudiedAt on the vocab set if it was a vocab quiz
     if (vocabSetId) {
-      await VocabSet.findByIdAndUpdate(vocabSetId, { lastStudiedAt: new Date() });
+      await VocabSet.findOneAndUpdate(
+        { _id: vocabSetId, user: req.user._id },
+        { lastStudiedAt: new Date() }
+      );
     }
 
     res.status(201).json({
@@ -154,7 +159,8 @@ const submitQuiz = async (req, res, next) => {
 const getProgress = async (req, res, next) => {
   try {
     const { setId, taskId } = req.query;
-    const filter = {};
+    // Fix #5: chỉ lấy progress của user hiện tại
+    const filter = { user: req.user._id };
     if (setId) filter.vocabSetId = setId;
     if (taskId) filter.listeningTaskId = taskId;
 

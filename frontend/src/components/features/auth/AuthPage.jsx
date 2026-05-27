@@ -24,6 +24,9 @@ export default function AuthPage() {
       success = await login(email || username, password);
       if (success) {
         toast.success('Chào mừng bạn quay trở lại!');
+      } else {
+        const errMsg = useAuthStore.getState().error;
+        toast.error(errMsg || 'Đăng nhập thất bại');
       }
     } else {
       if (!username.trim() || !email.trim() || !password.trim()) {
@@ -33,6 +36,9 @@ export default function AuthPage() {
       success = await register(username, email, password);
       if (success) {
         toast.success('Đăng ký tài khoản thành công!');
+      } else {
+        const errMsg = useAuthStore.getState().error;
+        toast.error(errMsg || 'Đăng ký thất bại');
       }
     }
   };

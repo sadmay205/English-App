@@ -3,22 +3,29 @@ const Vocabulary = require('../models/Vocabulary');
 const { parsePdfVocabulary } = require('../utils/pdfParser');
 
 /**
- * @desc    Get all vocabulary sets with word count
+ * @desc    Get all vocabulary sets with word count (scoped to current user)
  * @route   GET /api/vocabulary/sets
+ * Fix #5: User isolation — chỉ lấy sets của user hiện tại
+ * Fix #7: Dùng Aggregation để tránh N+1 queries
  */
 const getAllSets = async (req, res, next) => {
   try {
-    const sets = await VocabSet.find().sort({ lastStudiedAt: -1 });
+    const sets = await VocabSet.aggregate([
+      { $match: { user: req.user._id } },
+      {
+        $lookup: {
+          from: 'vocabularies',
+          localField: '_id',
+          foreignField: 'vocabSet',
+          as: 'words',
+        },
+      },
+      { $addFields: { wordCount: { $size: '$words' } } },
+      { $project: { words: 0 } },
+      { $sort: { lastStudiedAt: -1 } },
+    ]);
 
-    // Attach word count to each set
-    const setsWithCount = await Promise.all(
-      sets.map(async (set) => {
-        const count = await Vocabulary.countDocuments({ vocabSet: set._id });
-        return { ...set.toObject(), wordCount: count };
-      })
-    );
-
-    res.json(setsWithCount);
+    res.json(sets);
   } catch (error) {
     next(error);
   }
@@ -38,23 +45,25 @@ const createSet = async (req, res, next) => {
     }
 
     const set = await VocabSet.create({
+      user: req.user._id, // Fix #5: gắn owner
       title,
       description: description || '',
     });
 
-    res.status(201).json(set);
+    res.status(201).json({ ...set.toObject(), wordCount: 0 });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * @desc    Get a vocabulary set with all its words
+ * @desc    Get a vocabulary set with all its words (must belong to current user)
  * @route   GET /api/vocabulary/sets/:id
  */
 const getSetById = async (req, res, next) => {
   try {
-    const set = await VocabSet.findById(req.params.id);
+    // Fix #5: thêm điều kiện user vào query
+    const set = await VocabSet.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!set) {
       res.status(404);
@@ -86,8 +95,8 @@ const addVocabulary = async (req, res, next) => {
       throw new Error('Cần cung cấp vocabSetId, word và meaningVi');
     }
 
-    // Verify set exists
-    const set = await VocabSet.findById(vocabSetId);
+    // Fix #5: xác minh set tồn tại VÀ thuộc về user hiện tại
+    const set = await VocabSet.findOne({ _id: vocabSetId, user: req.user._id });
     if (!set) {
       res.status(404);
       throw new Error('Không tìm thấy bộ từ vựng');
@@ -102,7 +111,6 @@ const addVocabulary = async (req, res, next) => {
       exampleMeaningVi: exampleMeaningVi || '',
     });
 
-    // Update lastStudiedAt
     set.lastStudiedAt = new Date();
     await set.save();
 
@@ -130,14 +138,13 @@ const uploadPdf = async (req, res, next) => {
       throw new Error('Cần cung cấp vocabSetId');
     }
 
-    // Verify set exists
-    const set = await VocabSet.findById(vocabSetId);
+    // Fix #5: xác minh set tồn tại VÀ thuộc về user hiện tại
+    const set = await VocabSet.findOne({ _id: vocabSetId, user: req.user._id });
     if (!set) {
       res.status(404);
       throw new Error('Không tìm thấy bộ từ vựng');
     }
 
-    // Parse PDF
     const { words, groups } = await parsePdfVocabulary(req.file.buffer);
 
     if (words.length === 0) {
@@ -145,7 +152,6 @@ const uploadPdf = async (req, res, next) => {
       throw new Error('Không tìm thấy từ vựng trong file PDF');
     }
 
-    // Bulk insert vocabularies
     const vocabDocs = words.map((w) => ({
       vocabSet: vocabSetId,
       word: w.word,
@@ -155,7 +161,6 @@ const uploadPdf = async (req, res, next) => {
 
     const inserted = await Vocabulary.insertMany(vocabDocs);
 
-    // Update set
     set.lastStudiedAt = new Date();
     if (!set.description && groups.length > 0) {
       set.description = `Chủ đề: ${groups.join(', ')}`;
@@ -179,17 +184,15 @@ const uploadPdf = async (req, res, next) => {
  */
 const deleteSet = async (req, res, next) => {
   try {
-    const set = await VocabSet.findById(req.params.id);
+    // Fix #5: chỉ xóa set nếu thuộc về user hiện tại
+    const set = await VocabSet.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!set) {
       res.status(404);
       throw new Error('Không tìm thấy bộ từ vựng');
     }
 
-    // Delete all vocabularies in this set
     await Vocabulary.deleteMany({ vocabSet: set._id });
-
-    // Delete the set itself
     await VocabSet.findByIdAndDelete(set._id);
 
     res.json({ message: 'Đã xóa bộ từ vựng' });
@@ -204,11 +207,17 @@ const deleteSet = async (req, res, next) => {
  */
 const deleteVocabulary = async (req, res, next) => {
   try {
-    const vocab = await Vocabulary.findById(req.params.id);
+    const vocab = await Vocabulary.findById(req.params.id).populate('vocabSet');
 
     if (!vocab) {
       res.status(404);
       throw new Error('Không tìm thấy từ vựng');
+    }
+
+    // Fix #5: xác minh từ vựng thuộc bộ từ của user hiện tại
+    if (vocab.vocabSet && vocab.vocabSet.user.toString() !== req.user._id.toString()) {
+      res.status(403);
+      throw new Error('Không có quyền xóa từ vựng này');
     }
 
     await Vocabulary.findByIdAndDelete(req.params.id);
@@ -228,4 +237,3 @@ module.exports = {
   deleteSet,
   deleteVocabulary,
 };
-

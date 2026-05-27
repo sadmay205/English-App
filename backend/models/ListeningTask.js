@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const listeningTaskSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'Bài tập nghe phải thuộc về một người dùng'],
+    index: true,
+  },
   title: {
     type: String,
     required: [true, 'Tiêu đề bài tập nghe là bắt buộc'],

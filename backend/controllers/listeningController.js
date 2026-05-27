@@ -14,7 +14,6 @@ const processParagraph = async (req, res, next) => {
       throw new Error('Tiêu đề và nội dung đoạn văn là bắt buộc');
     }
 
-    // Split paragraph into sentences
     const sentenceTexts = splitParagraphIntoSentences(paragraphText);
 
     if (sentenceTexts.length === 0) {
@@ -24,10 +23,12 @@ const processParagraph = async (req, res, next) => {
 
     const sentences = sentenceTexts.map(text => ({
       text,
-      audioUrl: '' // Web Speech API will generate audio client-side
+      audioUrl: ''
     }));
 
+    // Fix #5: gắn user vào task mới
     const task = await ListeningTask.create({
+      user: req.user._id,
       title,
       paragraphText,
       sentences
@@ -45,7 +46,8 @@ const processParagraph = async (req, res, next) => {
  */
 const getAllTasks = async (req, res, next) => {
   try {
-    const tasks = await ListeningTask.find().sort({ createdAt: -1 });
+    // Fix #5: chỉ lấy tasks của user hiện tại
+    const tasks = await ListeningTask.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(tasks);
   } catch (error) {
     next(error);
@@ -58,7 +60,8 @@ const getAllTasks = async (req, res, next) => {
  */
 const getTaskById = async (req, res, next) => {
   try {
-    const task = await ListeningTask.findById(req.params.id);
+    // Fix #5: chỉ tìm task nếu thuộc về user hiện tại
+    const task = await ListeningTask.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!task) {
       res.status(404);
@@ -77,7 +80,8 @@ const getTaskById = async (req, res, next) => {
  */
 const deleteTask = async (req, res, next) => {
   try {
-    const task = await ListeningTask.findById(req.params.id);
+    // Fix #5: chỉ xóa task nếu thuộc về user hiện tại
+    const task = await ListeningTask.findOne({ _id: req.params.id, user: req.user._id });
 
     if (!task) {
       res.status(404);

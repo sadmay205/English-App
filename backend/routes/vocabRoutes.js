@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const { protect } = require('../middleware/authMiddleware'); // Fix #4
 const {
   getAllSets,
   createSet,
@@ -10,7 +11,6 @@ const {
   deleteSet,
   deleteVocabulary,
 } = require('../controllers/vocabController');
-
 
 // Configure multer for PDF upload (store in memory)
 const upload = multer({
@@ -24,6 +24,9 @@ const upload = multer({
     }
   },
 });
+
+// Fix #4: Tất cả routes yêu cầu đăng nhập
+router.use(protect);
 
 // GET /api/vocabulary/sets — Get all vocabulary sets
 router.get('/sets', getAllSets);
