@@ -1,0 +1,49 @@
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const {
+  getAllSets,
+  createSet,
+  getSetById,
+  addVocabulary,
+  uploadPdf,
+  deleteSet,
+  deleteVocabulary,
+} = require('../controllers/vocabController');
+
+
+// Configure multer for PDF upload (store in memory)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file PDF'), false);
+    }
+  },
+});
+
+// GET /api/vocabulary/sets — Get all vocabulary sets
+router.get('/sets', getAllSets);
+
+// POST /api/vocabulary/sets — Create a new vocabulary set
+router.post('/sets', createSet);
+
+// GET /api/vocabulary/sets/:id — Get a set with its vocabularies
+router.get('/sets/:id', getSetById);
+
+// POST /api/vocabulary/item — Add a single vocabulary to a set
+router.post('/item', addVocabulary);
+
+// POST /api/vocabulary/upload-pdf — Upload PDF and parse vocabularies
+router.post('/upload-pdf', upload.single('pdf'), uploadPdf);
+
+// DELETE /api/vocabulary/sets/:id — Delete a vocabulary set
+router.delete('/sets/:id', deleteSet);
+
+// DELETE /api/vocabulary/item/:id — Delete a single vocabulary word
+router.delete('/item/:id', deleteVocabulary);
+
+module.exports = router;
