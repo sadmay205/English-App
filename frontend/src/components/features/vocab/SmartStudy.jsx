@@ -96,6 +96,7 @@ export default function SmartStudy() {
       setWrongAttempts(prev => prev + 1);
       setShowOverride(true);
     }
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleOverride = () => {
@@ -103,6 +104,7 @@ export default function SmartStudy() {
     setIsCorrect(true);
     setShowOverride(false);
     toast.success('Đã ghi nhận câu trả lời của bạn!');
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleNext = () => {
@@ -305,7 +307,7 @@ export default function SmartStudy() {
             onKeyDown={handleKeyDown}
             placeholder={currentChallenge.phase === 1 ? "Gõ từ tiếng Anh..." : "Gõ nghĩa tiếng Việt..."}
             className={`study-input ${answered ? (isCorrect ? 'correct' : 'wrong') : ''}`}
-            disabled={answered}
+            readOnly={answered}
             id="study-answer-input"
             autoComplete="off"
             autoCorrect="off"
@@ -612,9 +614,15 @@ const studyStyles = `
     text-align: center;
   }
 
-  .study-input:focus {
+  .study-input:focus:not(.correct):not(.wrong) {
     border-color: var(--color-accent-primary);
     box-shadow: 0 0 0 3px var(--color-accent-glow);
+  }
+
+  .study-input.correct:focus,
+  .study-input.wrong:focus {
+    outline: none;
+    box-shadow: none;
   }
 
   .study-input.correct {

@@ -1,4 +1,4 @@
-import { BookOpen, Brain, Headphones, TrendingUp, GraduationCap, LogIn, LogOut, User, X } from 'lucide-react';
+import { BookOpen, Brain, Headphones, TrendingUp, GraduationCap, LogIn, LogOut, User, X, Layers } from 'lucide-react';
 import useAppStore from '../../store/useAppStore';
 import useAuthStore from '../../store/useAuthStore';
 import { useState } from 'react';
@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 const navItems = [
   { id: 'vocabulary', label: 'Từ vựng', icon: BookOpen, description: 'Quản lý bộ từ' },
   { id: 'study', label: 'Học thông minh', icon: GraduationCap, description: 'Lặp lại chủ động' },
+  { id: 'flashcard', label: 'Flashcard', icon: Layers, description: 'Định nghĩa & Từ vựng' },
   { id: 'quiz', label: 'Kiểm tra', icon: Brain, description: 'Trắc nghiệm & Điền từ' },
   { id: 'listening', label: 'Luyện nghe', icon: Headphones, description: 'Nghe & hoàn thành câu' },
   { id: 'progress', label: 'Tiến độ', icon: TrendingUp, description: 'Lịch sử học tập' },

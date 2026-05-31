@@ -88,7 +88,7 @@ const getSetById = async (req, res, next) => {
  */
 const addVocabulary = async (req, res, next) => {
   try {
-    const { vocabSetId, word, phonetic, meaningVi, exampleSentence, exampleMeaningVi } = req.body;
+    const { vocabSetId, word, phonetic, meaningVi, exampleSentence, exampleMeaningVi, englishDefinition } = req.body;
 
     if (!vocabSetId || !word || !meaningVi) {
       res.status(400);
@@ -109,6 +109,7 @@ const addVocabulary = async (req, res, next) => {
       meaningVi,
       exampleSentence: exampleSentence || '',
       exampleMeaningVi: exampleMeaningVi || '',
+      englishDefinition: englishDefinition || '',
     });
 
     set.lastStudiedAt = new Date();
@@ -228,6 +229,109 @@ const deleteVocabulary = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Generate English definitions for vocabulary words in a set using AI
+ * @route   POST /api/vocabulary/sets/:setId/generate-definitions
+ */
+const generateDefinitions = async (req, res, next) => {
+  try {
+    const { setId } = req.params;
+
+    // Verify set exists and belongs to current user
+    const set = await VocabSet.findOne({ _id: setId, user: req.user._id });
+    if (!set) {
+      res.status(404);
+      throw new Error('Không tìm thấy bộ từ vựng');
+    }
+
+    // Find all vocabularies in the set
+    const vocabularies = await Vocabulary.find({ vocabSet: setId });
+    
+    // Filter words missing English definitions
+    const missingVocabs = vocabularies.filter((v) => !v.englishDefinition);
+
+    if (missingVocabs.length === 0) {
+      return res.json({
+        message: 'Tất cả từ vựng đều đã có định nghĩa tiếng Anh!',
+        count: 0,
+        vocabularies,
+      });
+    }
+
+    // Batch compile definitions in groups of 15 to avoid token issues and rate limits
+    const { chatCompletion } = require('../config/openrouter');
+    const batchSize = 15;
+    const updatedVocabs = [];
+
+    for (let i = 0; i < missingVocabs.length; i += batchSize) {
+      const currentBatch = missingVocabs.slice(i, i + batchSize);
+      const batchData = currentBatch.map((v) => ({
+        id: v._id.toString(),
+        word: v.word,
+        meaningVi: v.meaningVi,
+      }));
+
+      const systemPrompt = `You are a dictionary lexicographer. Your task is to write a concise English definition for the given words.
+Rules:
+1. The definition must be very short and simple (1 sentence, max 15 words).
+2. It should explain the meaning clearly for a Vietnamese student learning English.
+3. DO NOT use the word itself in the definition.
+4. Output MUST be a valid JSON array of objects, with keys "id" and "definition". Do not include markdown code block wrapper or any extra explanations.
+Example output format:
+[{"id": "...", "definition": "..."}]`;
+
+      const userPrompt = `Provide definitions for this JSON list of words:\n${JSON.stringify(batchData)}`;
+
+      try {
+        const response = await chatCompletion([
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ], {
+          temperature: 0.3,
+        });
+
+        if (response && response.choices && response.choices[0]) {
+          let textResult = response.choices[0].message.content.trim();
+          
+          // Remove Markdown wrappers if present
+          if (textResult.startsWith('```')) {
+            textResult = textResult.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+          }
+
+          const parsedDefinitions = JSON.parse(textResult);
+
+          if (Array.isArray(parsedDefinitions)) {
+            for (const item of parsedDefinitions) {
+              const vocab = await Vocabulary.findOneAndUpdate(
+                { _id: item.id, vocabSet: setId },
+                { englishDefinition: item.definition.trim() },
+                { new: true }
+              );
+              if (vocab) {
+                updatedVocabs.push(vocab);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error generating batch of definitions:', err);
+        // Continue to other batches or return what we completed
+      }
+    }
+
+    // Retrieve final list of vocabularies
+    const finalVocabularies = await Vocabulary.find({ vocabSet: setId });
+
+    res.json({
+      message: `Đã tự động tạo định nghĩa tiếng Anh cho ${updatedVocabs.length} từ vựng!`,
+      count: updatedVocabs.length,
+      vocabularies: finalVocabularies,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllSets,
   createSet,
@@ -236,4 +340,5 @@ module.exports = {
   uploadPdf,
   deleteSet,
   deleteVocabulary,
+  generateDefinitions,
 };

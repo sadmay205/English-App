@@ -100,6 +100,26 @@ const useVocabStore = create((set, get) => ({
     }
   },
 
+  // Generate English definitions using AI
+  generateDefinitions: async (setId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post(`/vocabulary/sets/${setId}/generate-definitions`);
+      set((state) => ({
+        vocabularies: data.vocabularies,
+        currentSet: state.currentSet ? { ...state.currentSet, vocabularies: data.vocabularies } : null,
+        isLoading: false,
+      }));
+      return data;
+    } catch (error) {
+      set({
+        error: error.response?.data?.message || 'Lỗi khi tạo định nghĩa tiếng Anh',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
   // Delete a vocabulary set
   deleteSet: async (id) => {
     try {

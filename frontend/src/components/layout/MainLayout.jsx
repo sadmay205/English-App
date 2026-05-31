@@ -6,6 +6,7 @@ import QuizContainer from '../features/quiz/QuizContainer';
 import ListeningContainer from '../features/listening/ListeningContainer';
 import ProgressDashboard from '../features/progress/ProgressView';
 import SmartStudy from '../features/vocab/SmartStudy';
+import FlashcardStudy from '../features/vocab/FlashcardStudy';
 import { Brain, Headphones, TrendingUp, Palette, Upload, Check } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,10 @@ function VocabularyView() {
 
 function StudyView() {
   return <SmartStudy />;
+}
+
+function FlashcardView() {
+  return <FlashcardStudy />;
 }
 
 function QuizView() {
@@ -34,6 +39,7 @@ function ProgressView() {
 const viewMap = {
   vocabulary: VocabularyView,
   study: StudyView,
+  flashcard: FlashcardView,
   quiz: QuizView,
   listening: ListeningView,
   progress: ProgressView,

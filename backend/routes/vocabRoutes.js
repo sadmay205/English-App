@@ -10,6 +10,7 @@ const {
   uploadPdf,
   deleteSet,
   deleteVocabulary,
+  generateDefinitions,
 } = require('../controllers/vocabController');
 
 // Configure multer for PDF upload (store in memory)
@@ -36,6 +37,9 @@ router.post('/sets', createSet);
 
 // GET /api/vocabulary/sets/:id — Get a set with its vocabularies
 router.get('/sets/:id', getSetById);
+
+// POST /api/vocabulary/sets/:setId/generate-definitions — Generate definitions using AI
+router.post('/sets/:setId/generate-definitions', generateDefinitions);
 
 // POST /api/vocabulary/item — Add a single vocabulary to a set
 router.post('/item', addVocabulary);

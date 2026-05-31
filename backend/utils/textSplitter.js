@@ -30,7 +30,11 @@ const splitParagraphIntoSentences = (text) => {
     const words = currentSentence.trim().split(/\s+/);
     const lastWord = words[words.length - 1].toLowerCase();
     
-    const endsWithAbbreviation = abbreviations.some(abbr => lastWord === abbr || lastWord.endsWith('.' + abbr));
+    const endsWithAbbreviation = abbreviations.some(abbr => {
+      // Strip leading non-alphanumeric and non-dot characters (e.g. parenthesis, quotes)
+      const cleanWord = lastWord.replace(/^[^a-z0-9.]+/, '');
+      return cleanWord === abbr || cleanWord.endsWith('.' + abbr);
+    });
 
     if (!endsWithAbbreviation) {
       result.push(currentSentence.trim());

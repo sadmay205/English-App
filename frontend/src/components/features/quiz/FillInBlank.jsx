@@ -56,6 +56,7 @@ export default function FillInBlank() {
     if (!userInput.trim() || answered) return;
     setAnswered(true);
     submitAnswer(userInput);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleKeyDown = (e) => {
@@ -145,7 +146,7 @@ export default function FillInBlank() {
           onKeyDown={handleKeyDown}
           placeholder="Gõ từ tiếng Anh..."
           className={`fill-input ${answered ? (isCorrect ? 'correct' : 'wrong') : ''}`}
-          disabled={answered}
+          readOnly={answered}
           id="fill-answer-input"
         />
         {!answered && (
@@ -311,9 +312,15 @@ export default function FillInBlank() {
           letter-spacing: 1px;
         }
 
-        .fill-input:focus {
+        .fill-input:focus:not(.correct):not(.wrong) {
           border-color: var(--color-accent-primary);
           box-shadow: 0 0 0 3px var(--color-accent-glow);
+        }
+
+        .fill-input.correct:focus,
+        .fill-input.wrong:focus {
+          outline: none;
+          box-shadow: none;
         }
 
         .fill-input.correct {

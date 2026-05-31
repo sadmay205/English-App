@@ -41,6 +41,7 @@ const isNoiseLine = (line) => {
  * Supports:
  * 1. Standard format: "* Word /phonetic/ (pos): Meaning"
  * 2. Unstructured format: Lowercase word lines + "+" definition + English examples
+ * 3. Slash format: "Word /phonetic/ Meaning"
  * 
  * @param {Buffer} pdfBuffer - The PDF file buffer
  * @returns {Promise<{words: Array, groups: Array}>}
@@ -54,6 +55,11 @@ const parsePdfVocabulary = async (pdfBuffer) => {
 
   // Check if document has asterisk entries
   const hasAsterisks = rawLines.some((line) => line.startsWith('*'));
+
+  // Check if document has slash entries (e.g. word /phonetic/ meaning)
+  const slashPattern = /^([^\/]+?)\s*\/([^\/]+)\/\s*(.+)$/;
+  const slashLinesCount = rawLines.filter(line => slashPattern.test(line)).length;
+  const hasSlashFormat = slashLinesCount >= 3;
 
   if (hasAsterisks) {
     // ---------------- Standard Asterisk Parser ----------------
@@ -132,6 +138,43 @@ const parsePdfVocabulary = async (pdfBuffer) => {
     words.forEach((w) => {
       w.meaningVi = w.meaningVi.replace(/\s+/g, ' ').trim();
     });
+
+    return { words, groups };
+  } else if (hasSlashFormat) {
+    // ---------------- Slash Format Parser ----------------
+    const words = [];
+    const groups = [];
+    let currentGroup = '';
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+
+      // Skip common headings that aren't entries or group headers
+      if (line === 'Từ vựngPhiên âmNghĩa tiếng Việt' || (line.includes('Từ vựng') && line.includes('Phiên âm'))) {
+        continue;
+      }
+
+      // Detect group headers
+      const groupMatch = line.match(/^\d+\.\s*(.+)$/);
+      if (groupMatch) {
+        currentGroup = groupMatch[1].trim();
+        if (!groups.includes(currentGroup)) {
+          groups.push(currentGroup);
+        }
+        continue;
+      }
+
+      // Detect slash format vocabulary entries
+      const slashMatch = line.match(slashPattern);
+      if (slashMatch) {
+        words.push({
+          word: slashMatch[1].trim(),
+          phonetic: `/${slashMatch[2].trim()}/`,
+          meaningVi: slashMatch[3].trim(),
+          group: currentGroup,
+        });
+      }
+    }
 
     return { words, groups };
   } else {

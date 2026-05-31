@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Volume2, Plus, Search, Upload, Trash2 } from 'lucide-react';
 import useVocabStore from '../../../store/useVocabStore';
 import PdfImportZone from './PdfImportZone';
+import api from '../../../services/api';
 import { toast } from 'sonner';
 
 export default function VocabList({ vocabSetId }) {
@@ -11,8 +12,10 @@ export default function VocabList({ vocabSetId }) {
   const [newWord, setNewWord] = useState('');
   const [newPhonetic, setNewPhonetic] = useState('');
   const [newMeaning, setNewMeaning] = useState('');
+  const [newEnglishDefinition, setNewEnglishDefinition] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, word }
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const handleSpeak = (text) => {
     if ('speechSynthesis' in window) {
@@ -37,13 +40,20 @@ export default function VocabList({ vocabSetId }) {
 
 
   const handleAddWord = async () => {
-
-    if (!newWord.trim() || !newMeaning.trim()) return;
+    if (!newWord.trim()) {
+      toast.error('Vui lòng nhập từ tiếng Anh!');
+      return;
+    }
+    if (!newMeaning.trim()) {
+      toast.error('Vui lòng nhập nghĩa tiếng Việt!');
+      return;
+    }
 
     const result = await addWord(vocabSetId, {
       word: newWord.trim(),
       phonetic: newPhonetic.trim(),
       meaningVi: newMeaning.trim(),
+      englishDefinition: newEnglishDefinition.trim(),
     });
 
     if (result) {
@@ -51,9 +61,42 @@ export default function VocabList({ vocabSetId }) {
       setNewWord('');
       setNewPhonetic('');
       setNewMeaning('');
+      setNewEnglishDefinition('');
       setShowAddForm(false);
     } else {
       toast.error('Lỗi khi thêm từ vựng.');
+    }
+  };
+
+  const handleAiAutoFill = async () => {
+    if (!newWord.trim()) return;
+    setIsTranslating(true);
+    toast.info('AI đang dịch và soạn định nghĩa...');
+    try {
+      const prompt = `You are a professional English-Vietnamese dictionary. For the English word "${newWord.trim()}", translate it to Vietnamese, find its IPA phonetic spelling, and write a very concise, clear English definition (1 short sentence, max 15 words) for flashcards (DO NOT use the word itself in the definition).
+Return ONLY a valid JSON object with keys: "meaningVi", "phonetic", and "englishDefinition". Do not include markdown code block backticks.
+Example output format:
+{"meaningVi": "Cơ sở dữ liệu", "phonetic": "/ˈdeɪtəbeɪs/", "englishDefinition": "A structured set of data held in a computer."}`;
+
+      const { data } = await api.post('/ai/chat', {
+        messages: [{ role: 'user', content: prompt }]
+      });
+
+      let text = data.message.content.trim();
+      if (text.startsWith('```')) {
+        text = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+      }
+
+      const result = JSON.parse(text);
+      if (result.meaningVi) setNewMeaning(result.meaningVi);
+      if (result.phonetic) setNewPhonetic(result.phonetic);
+      if (result.englishDefinition) setNewEnglishDefinition(result.englishDefinition);
+      toast.success('AI đã tự động điền các trường thành công!');
+    } catch (err) {
+      console.error('Error in AI auto fill:', err);
+      toast.error('Không thể dịch bằng AI. Vui lòng tự nhập nghĩa.');
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -164,12 +207,44 @@ export default function VocabList({ vocabSetId }) {
               />
             </div>
           </div>
-          <div className="vocab-add-actions">
-            <button onClick={handleAddWord} className="btn-primary" disabled={!newWord.trim() || !newMeaning.trim()}>
-              Thêm từ
-            </button>
-            <button onClick={() => setShowAddForm(false)} className="btn-ghost">
-              Hủy
+          <div className="vocab-add-row" style={{ marginTop: '0.75rem' }}>
+            <div className="vocab-add-field">
+              <label>Định nghĩa tiếng Anh (tùy chọn)</label>
+              <input
+                type="text"
+                value={newEnglishDefinition}
+                onChange={(e) => setNewEnglishDefinition(e.target.value)}
+                placeholder="The process of dividing an investment portfolio among different asset categories."
+                className="input"
+                id="new-definition-input"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddWord()}
+              />
+            </div>
+          </div>
+          <div className="vocab-add-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={handleAddWord} className="btn-primary" id="save-word-btn">
+                Thêm từ
+              </button>
+              <button onClick={() => setShowAddForm(false)} className="btn-ghost">
+                Hủy
+              </button>
+            </div>
+            
+            <button
+              onClick={handleAiAutoFill}
+              className="btn-ghost"
+              disabled={!newWord.trim() || isTranslating}
+              type="button"
+              style={{
+                borderColor: 'var(--color-accent-primary)',
+                color: 'var(--color-accent-primary)',
+                background: 'var(--color-accent-glow)',
+                padding: '0.5rem 0.875rem',
+                fontSize: '0.8rem',
+              }}
+            >
+              {isTranslating ? 'Đang điền...' : '✨ Điền nhanh bằng AI'}
             </button>
           </div>
         </div>
@@ -204,6 +279,11 @@ export default function VocabList({ vocabSetId }) {
                   </button>
                 </div>
                 <div className="vocab-word-meaning">{vocab.meaningVi}</div>
+                {vocab.englishDefinition && (
+                  <div className="vocab-word-definition" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic', marginTop: '0.125rem' }}>
+                    Def: {vocab.englishDefinition}
+                  </div>
+                )}
               </div>
               <button
                 className="vocab-word-delete"

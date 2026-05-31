@@ -27,6 +27,10 @@ const vocabularySchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  englishDefinition: {
+    type: String,
+    default: '',
+  },
 });
 
 module.exports = mongoose.model('Vocabulary', vocabularySchema);

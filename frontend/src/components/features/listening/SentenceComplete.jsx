@@ -76,6 +76,7 @@ export default function SentenceComplete({ task, onBack }) {
     if (isAnswerCorrect) {
       setScore((s) => s + 1);
     }
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleKeyDown = (e) => {
@@ -212,7 +213,7 @@ export default function SentenceComplete({ task, onBack }) {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={isCorrect !== null}
+                readOnly={isCorrect !== null}
                 placeholder="Nhập câu tiếng Anh..."
                 className={`dict-input ${isCorrect === true ? 'correct' : isCorrect === false ? 'incorrect' : ''}`}
               />
@@ -519,9 +520,15 @@ export default function SentenceComplete({ task, onBack }) {
           transition: all 0.3s ease;
         }
 
-        .dict-input:focus {
+        .dict-input:focus:not(.correct):not(.incorrect) {
           border-color: var(--color-accent-primary);
           box-shadow: 0 0 0 3px var(--color-accent-glow);
+        }
+
+        .dict-input.correct:focus,
+        .dict-input.incorrect:focus {
+          outline: none;
+          box-shadow: none;
         }
 
         .dict-input.correct {
