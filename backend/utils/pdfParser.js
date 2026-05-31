@@ -61,6 +61,9 @@ const parsePdfVocabulary = async (pdfBuffer) => {
   const slashLinesCount = rawLines.filter(line => slashPattern.test(line)).length;
   const hasSlashFormat = slashLinesCount >= 3;
 
+  // Check if document has table-wrapped entries (with phonetic starting on its own line)
+  const hasTableFormat = rawLines.some((line) => line.startsWith('/') && !line.match(/^\d+\.\s*(.+)$/));
+
   if (hasAsterisks) {
     // ---------------- Standard Asterisk Parser ----------------
     const words = [];
@@ -138,6 +141,139 @@ const parsePdfVocabulary = async (pdfBuffer) => {
     words.forEach((w) => {
       w.meaningVi = w.meaningVi.replace(/\s+/g, ' ').trim();
     });
+
+    return { words, groups };
+  } else if (hasTableFormat) {
+    // ---------------- Table Format Parser (for split column layouts) ----------------
+    // Filter out headers
+    const isHeaderLine = (line) => {
+      const norm = line.toLowerCase();
+      return (
+        norm.includes('từ vựng tiếng anh chuyên ngành sql') ||
+        norm.includes('& database') ||
+        norm.includes('ứng dụng phương pháp active recall') ||
+        norm.includes('từ vựngphiên âmnghĩa tiếng') ||
+        norm.includes('nghĩa tiếng anh (ngữ cảnh)') ||
+        norm === 'việt' ||
+        norm === 'từ vựng' ||
+        norm === 'phiên âm'
+      );
+    };
+
+    const cleanLines = [];
+    for (let line of rawLines) {
+      if (isHeaderLine(line)) {
+        continue;
+      }
+      cleanLines.push(line);
+    }
+
+    // Find phonetic ranges
+    const phoneticRanges = [];
+    for (let i = 0; i < cleanLines.length; i++) {
+      const line = cleanLines[i];
+      if (line.startsWith('/') && !line.match(/^\d+\.\s*(.+)$/)) {
+        let pStart = i;
+        let pEnd = i;
+        for (let j = i; j < cleanLines.length; j++) {
+          if (cleanLines[j].endsWith('/') && (j > i || cleanLines[j] !== '/')) {
+            pEnd = j;
+            break;
+          }
+          if (j > i && (cleanLines[j].startsWith('/') || cleanLines[j].match(/^\d+\.\s*(.+)$/))) {
+            break;
+          }
+        }
+        phoneticRanges.push({ pStart, pEnd });
+        i = pEnd;
+      }
+    }
+
+    // Parse entries
+    const entries = [];
+    for (let k = 0; k < phoneticRanges.length; k++) {
+      const { pStart, pEnd } = phoneticRanges[k];
+      
+      // Find word lines
+      let wordLines = [];
+      let idx = pStart - 1;
+      const prevEnd = k > 0 ? phoneticRanges[k-1].pEnd : -1;
+      while (idx > prevEnd) {
+        const line = cleanLines[idx];
+        if (line.match(/^\d+\.\s*(.+)$/)) {
+          break; // Group header
+        }
+        if (/[.!?]$/.test(line)) {
+          break; // Definition punctuation
+        }
+        if (containsVietnamese(line)) {
+          break; // Vietnamese definition
+        }
+        wordLines.unshift(line);
+        idx--;
+      }
+      const word = wordLines.join(' ').trim();
+      const phonetic = cleanLines.slice(pStart, pEnd + 1).join(' ').trim();
+
+      entries.push({
+        pStart,
+        pEnd,
+        word,
+        phonetic,
+        wordStart: idx + 1,
+      });
+    }
+
+    // Parse definitions and groups
+    const words = [];
+    const groups = [];
+    for (let k = 0; k < entries.length; k++) {
+      const entry = entries[k];
+      
+      // Find group
+      let group = '';
+      for (let idx = 0; idx < entry.pStart; idx++) {
+        const match = cleanLines[idx].match(/^\d+\.\s*(.+)$/);
+        if (match) {
+          group = match[1].trim();
+        }
+      }
+      if (group && !groups.includes(group)) {
+        groups.push(group);
+      }
+
+      // Find definition lines
+      let defEnd = (k < entries.length - 1) ? entries[k+1].wordStart - 1 : cleanLines.length - 1;
+      for (let idx = entry.pEnd + 1; idx <= defEnd; idx++) {
+        if (cleanLines[idx].match(/^\d+\.\s*(.+)$/)) {
+          defEnd = idx - 1;
+          break;
+        }
+      }
+
+      const defLines = cleanLines.slice(entry.pEnd + 1, defEnd + 1);
+      const defText = defLines.join(' ').replace(/\s+/g, ' ').trim();
+
+      // Split definition text into meaningVi and englishDefinition
+      const splitRegex = /([a-zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệđìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ])\s*([A-Z])/;
+      const match = defText.match(splitRegex);
+      let meaningVi = defText;
+      let englishDefinition = '';
+      
+      if (match) {
+        const index = defText.indexOf(match[2], match.index);
+        meaningVi = defText.slice(0, index).trim();
+        englishDefinition = defText.slice(index).trim();
+      }
+
+      words.push({
+        word: entry.word,
+        phonetic: entry.phonetic,
+        meaningVi,
+        englishDefinition,
+        group,
+      });
+    }
 
     return { words, groups };
   } else if (hasSlashFormat) {

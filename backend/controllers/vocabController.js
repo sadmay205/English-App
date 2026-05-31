@@ -158,6 +158,9 @@ const uploadPdf = async (req, res, next) => {
       word: w.word,
       phonetic: w.phonetic,
       meaningVi: w.meaningVi,
+      englishDefinition: w.englishDefinition || '',
+      exampleSentence: w.exampleSentence || '',
+      exampleMeaningVi: w.exampleMeaningVi || '',
     }));
 
     const inserted = await Vocabulary.insertMany(vocabDocs);
