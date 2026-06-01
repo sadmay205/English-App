@@ -17,33 +17,52 @@ export default function FlashcardStudy() {
   const [wrongAttempts, setWrongAttempts] = useState({}); // Track wrong attempts per card ID
   const [masteredList, setMasteredList] = useState([]);
   const [failedList, setFailedList] = useState([]); // List of card IDs that were marked "Chưa thuộc" at least once
+  const [swipeDirection, setSwipeDirection] = useState(null); // 'left' | 'right' | null
 
   useEffect(() => {
     fetchSets();
   }, []);
 
+  // Refs to avoid stale closures in window event listener
+  const isFlippedRef = useRef(isFlipped);
+  const handleMarkWrongRef = useRef(null);
+  const handleMarkCorrectRef = useRef(null);
+
+  useEffect(() => {
+    isFlippedRef.current = isFlipped;
+    handleMarkWrongRef.current = handleMarkWrong;
+    handleMarkCorrectRef.current = handleMarkCorrect;
+  });
+
   // Keyboard controls
   useEffect(() => {
-    if (!studying || queue.length === 0) return;
+    if (!studying) return;
 
     const handleKeyDown = (e) => {
+      // Ignore shortcut keys if typing in input/textarea (like the AI chatbot panel)
+      if (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.isContentEditable
+      ) {
+        return;
+      }
+
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         setIsFlipped((prev) => !prev);
       } else if (e.key === 'ArrowLeft' || e.key === '1') {
-        if (isFlipped) {
-          handleMarkWrong();
-        }
+        e.preventDefault();
+        handleMarkWrongRef.current();
       } else if (e.key === 'ArrowRight' || e.key === '2') {
-        if (isFlipped) {
-          handleMarkCorrect();
-        }
+        e.preventDefault();
+        handleMarkCorrectRef.current();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [studying, queue, isFlipped]);
+  }, [studying]);
 
   const handleStartFlashcard = async (setId) => {
     setSelectedSetId(setId);
@@ -102,22 +121,30 @@ export default function FlashcardStudy() {
   };
 
   const handleMarkCorrect = () => {
+    if (swipeDirection) return; // Prevent double trigger
     const currentCard = queue[0];
+    if (!currentCard) return;
+
     // If it was never marked failed, it is mastered perfectly
     if (!failedList.includes(currentCard._id)) {
       setMasteredList(prev => [...prev, currentCard]);
     }
     
-    setIsFlipped(false);
-    // Smooth delay to transition to next card after flip animation completes
+    setSwipeDirection('right');
+    
+    // Smooth delay to transition to next card after swipe animation completes
     setTimeout(() => {
       setQueue((prev) => prev.slice(1));
       setCurrentIdx((prev) => prev + 1);
-    }, 250);
+      setIsFlipped(false);
+      setSwipeDirection(null);
+    }, 300);
   };
 
   const handleMarkWrong = () => {
+    if (swipeDirection) return; // Prevent double trigger
     const currentCard = queue[0];
+    if (!currentCard) return;
     
     // Add to failedList if not already there
     if (!failedList.includes(currentCard._id)) {
@@ -130,7 +157,7 @@ export default function FlashcardStudy() {
       [currentCard._id]: (prev[currentCard._id] || 0) + 1,
     }));
 
-    setIsFlipped(false);
+    setSwipeDirection('left');
     
     // Leitner repeat: move failed card to the end of the queue
     setTimeout(() => {
@@ -138,7 +165,9 @@ export default function FlashcardStudy() {
         const nextQueue = prev.slice(1);
         return [...nextQueue, currentCard];
       });
-    }, 250);
+      setIsFlipped(false);
+      setSwipeDirection(null);
+    }, 300);
   };
 
   const handleStudyOnlyFailed = () => {
@@ -383,8 +412,13 @@ export default function FlashcardStudy() {
 
       {/* 3D Flipping Card */}
       <div 
-        className={`flashcard-wrapper ${isFlipped ? 'flipped' : ''}`}
-        onClick={() => setIsFlipped(!isFlipped)}
+        key={currentCard._id}
+        className={`flashcard-wrapper ${isFlipped ? 'flipped' : ''} ${swipeDirection ? `swipe-${swipeDirection}` : ''}`}
+        onClick={() => {
+          if (!swipeDirection) {
+            setIsFlipped(!isFlipped);
+          }
+        }}
       >
         <div className="flashcard-inner">
           {/* Front Side: English Definition */}
@@ -858,6 +892,39 @@ const styles = `
     transition: width 0.3s ease;
   }
 
+  @keyframes cardEntrance {
+    0% {
+      opacity: 0;
+      transform: scale(0.93) translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes swipeLeft {
+    0% {
+      transform: translateX(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(-150%) rotate(-15deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes swipeRight {
+    0% {
+      transform: translateX(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(150%) rotate(15deg);
+      opacity: 0;
+    }
+  }
+
   /* 3D Flashcard Animation Styles */
   .flashcard-wrapper {
     perspective: 1000px;
@@ -865,6 +932,18 @@ const styles = `
     height: 320px;
     margin-bottom: 1.5rem;
     cursor: pointer;
+    animation: cardEntrance 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.2s ease;
+  }
+
+  .flashcard-wrapper.swipe-left {
+    animation: swipeLeft 0.3s forwards cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: none;
+  }
+
+  .flashcard-wrapper.swipe-right {
+    animation: swipeRight 0.3s forwards cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: none;
   }
 
   .flashcard-inner {
