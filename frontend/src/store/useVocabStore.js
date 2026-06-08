@@ -156,6 +156,21 @@ const useVocabStore = create((set, get) => ({
     }
   },
 
+  // Update a single vocabulary word
+  updateWord: async (vocabSetId, wordId, wordData) => {
+    set({ error: null });
+    try {
+      const { data } = await api.put(`/vocabulary/item/${wordId}`, wordData);
+      set((state) => ({
+        vocabularies: state.vocabularies.map((v) => (v._id === wordId ? data : v)),
+      }));
+      return data;
+    } catch (error) {
+      set({ error: error.response?.data?.message || 'Lỗi khi cập nhật từ vựng' });
+      return null;
+    }
+  },
+
   // Clear current set
   clearCurrentSet: () => set({ currentSet: null, vocabularies: [] }),
 }));

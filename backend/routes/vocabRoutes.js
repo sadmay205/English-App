@@ -11,6 +11,7 @@ const {
   deleteSet,
   deleteVocabulary,
   generateDefinitions,
+  updateVocabulary,
 } = require('../controllers/vocabController');
 
 // Configure multer for PDF upload (store in memory)
@@ -52,5 +53,8 @@ router.delete('/sets/:id', deleteSet);
 
 // DELETE /api/vocabulary/item/:id — Delete a single vocabulary word
 router.delete('/item/:id', deleteVocabulary);
+
+// PUT /api/vocabulary/item/:id — Update a single vocabulary word
+router.put('/item/:id', updateVocabulary);
 
 module.exports = router;

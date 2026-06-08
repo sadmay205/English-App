@@ -5,7 +5,10 @@ import api from '../../../services/api';
 const getQuizTypeLabel = (type) => {
   switch (type) {
     case 'multiple-choice':
-      return 'Trắc nghiệm từ vựng';
+    case 'multiple-choice-vie':
+      return 'Trắc nghiệm Việt';
+    case 'multiple-choice-en':
+      return 'Trắc nghiệm Anh';
     case 'fill-blank':
       return 'Điền từ vựng';
     case 'listening-quiz':
@@ -51,7 +54,7 @@ export default function ProgressView() {
     ? Math.round(Math.max(...history.map(h => (h.score / h.totalQuestions))) * 100)
     : 0;
 
-  const vocabTestsCount = history.filter(h => ['multiple-choice', 'fill-blank'].includes(h.quizType)).length;
+  const vocabTestsCount = history.filter(h => ['multiple-choice-vie', 'multiple-choice', 'multiple-choice-en', 'fill-blank'].includes(h.quizType)).length;
   const listeningTestsCount = history.filter(h => ['listening-quiz', 'listening-complete'].includes(h.quizType)).length;
 
   return (

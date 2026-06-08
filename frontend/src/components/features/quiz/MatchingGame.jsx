@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { RotateCcw, Trophy, CheckCircle, Clock } from 'lucide-react';
+import { RotateCcw, Trophy, CheckCircle, Clock, LogOut } from 'lucide-react';
 import useQuizStore from '../../../store/useQuizStore';
 import { toast } from 'sonner';
 
 export default function MatchingGame() {
-  const { questions, score, isCompleted, showResult, submitQuiz, resetQuiz, timeLimit } = useQuizStore();
+  const { questions, score, isCompleted, showResult, submitQuiz, resetQuiz, timeLimit, quizType } = useQuizStore();
   
   const [englishCards, setEnglishCards] = useState([]);
   const [vietnameseCards, setVietnameseCards] = useState([]);
@@ -31,11 +31,16 @@ export default function MatchingGame() {
   useEffect(() => {
     if (questions.length > 0) {
       const eng = questions.map(q => ({ id: q.id, text: q.word, type: 'english' }));
-      const vie = questions.map(q => ({ id: q.id, text: q.meaningVi, type: 'vietnamese' }));
+      const isEnDef = quizType === 'matching-en';
+      const rightSide = questions.map(q => ({
+        id: q.id,
+        text: isEnDef ? q.englishDefinition : q.meaningVi,
+        type: isEnDef ? 'english-def' : 'vietnamese'
+      }));
       setEnglishCards(shuffle(eng));
-      setVietnameseCards(shuffle(vie));
+      setVietnameseCards(shuffle(rightSide));
     }
-  }, [questions]);
+  }, [questions, quizType]);
 
   // Game timer & Countdown
   useEffect(() => {
@@ -193,9 +198,14 @@ export default function MatchingGame() {
   }
 
   return (
-    <div className="match-game-container animate-fade-in">
+    <div className="match-game-container card glass animate-fade-in" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', maxWidth: '720px', margin: '0 auto', background: 'rgba(22, 22, 37, 0.92)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)' }}>
       <div className="match-header">
-        <h3>🧩 Trò chơi ghép từ</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button onClick={resetQuiz} className="match-exit-btn" title="Thoát trò chơi">
+            <LogOut size={16} />
+          </button>
+          <h3>🧩 Trò chơi ghép từ</h3>
+        </div>
         <div className="match-header-stats">
           {timeLimit !== null && (
             <div className={`match-timer ${timeLeft < 10 ? 'urgent' : ''}`}>
@@ -238,13 +248,15 @@ export default function MatchingGame() {
           </div>
         </div>
 
-        {/* Vietnamese Column */}
+        {/* Vietnamese / English Definition Column */}
         <div className="match-column">
-          <h4 className="column-title">Tiếng Việt</h4>
+          <h4 className="column-title">
+            {quizType === 'matching-en' ? 'Định nghĩa (Anh)' : 'Tiếng Việt'}
+          </h4>
           <div className="cards-stack">
             {vietnameseCards.map((card) => {
               const isMatched = matchedIds.has(card.id);
-              const isSelected = selectedCard?.id === card.id && selectedCard?.type === 'vietnamese';
+              const isSelected = selectedCard?.id === card.id && selectedCard?.type === card.type;
               const isFailed = failedIds.has(card.id);
 
               let cardClass = "match-card";
@@ -370,6 +382,30 @@ const gameStyles = `
     align-items: center;
     font-family: inherit;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  .match-exit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-default);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+  }
+
+  .match-exit-btn:hover {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+    border-color: var(--color-error);
   }
 
   .match-card:hover:not(:disabled) {
@@ -421,9 +457,12 @@ const resultStyles = `
     padding: 3rem 2rem;
     max-width: 460px;
     margin: 2rem auto;
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border-accent);
+    background: rgba(22, 22, 37, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   }
 
   .match-result-icon {

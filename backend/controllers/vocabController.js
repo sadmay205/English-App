@@ -335,6 +335,43 @@ Example output format:
   }
 };
 
+/**
+ * @desc    Update a vocabulary word details
+ * @route   PUT /api/vocabulary/item/:id
+ */
+const updateVocabulary = async (req, res, next) => {
+  try {
+    const { word, phonetic, meaningVi, exampleSentence, exampleMeaningVi, englishDefinition } = req.body;
+
+    const vocab = await Vocabulary.findById(req.params.id).populate('vocabSet');
+
+    if (!vocab) {
+      res.status(404);
+      throw new Error('Không tìm thấy từ vựng');
+    }
+
+    // Verify user owns the set
+    if (vocab.vocabSet && vocab.vocabSet.user.toString() !== req.user._id.toString()) {
+      res.status(403);
+      throw new Error('Không có quyền chỉnh sửa từ vựng này');
+    }
+
+    // Update fields
+    if (word !== undefined) vocab.word = word;
+    if (phonetic !== undefined) vocab.phonetic = phonetic;
+    if (meaningVi !== undefined) vocab.meaningVi = meaningVi;
+    if (exampleSentence !== undefined) vocab.exampleSentence = exampleSentence;
+    if (exampleMeaningVi !== undefined) vocab.exampleMeaningVi = exampleMeaningVi;
+    if (englishDefinition !== undefined) vocab.englishDefinition = englishDefinition;
+
+    const updated = await vocab.save();
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllSets,
   createSet,
@@ -344,4 +381,5 @@ module.exports = {
   deleteSet,
   deleteVocabulary,
   generateDefinitions,
+  updateVocabulary,
 };

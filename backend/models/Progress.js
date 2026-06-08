@@ -19,7 +19,7 @@ const progressSchema = new mongoose.Schema({
   },
   quizType: {
     type: String,
-    enum: ['multiple-choice', 'fill-blank', 'matching', 'smart-study', 'listening-complete', 'listening-quiz'],
+    enum: ['multiple-choice', 'multiple-choice-vie', 'multiple-choice-en', 'fill-blank', 'fill-blank-en', 'matching', 'matching-en', 'smart-study', 'listening-complete', 'listening-quiz', 'custom'],
     required: true,
   },
   score: {

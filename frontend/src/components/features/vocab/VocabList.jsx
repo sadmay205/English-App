@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Volume2, Plus, Search, Upload, Trash2 } from 'lucide-react';
+import { Volume2, Plus, Search, Upload, Trash2, Edit3, AlertCircle } from 'lucide-react';
 import useVocabStore from '../../../store/useVocabStore';
 import PdfImportZone from './PdfImportZone';
 import api from '../../../services/api';
 import { toast } from 'sonner';
 
 export default function VocabList({ vocabSetId }) {
-  const { vocabularies, addWord, deleteWord } = useVocabStore();
+  const { vocabularies, addWord, deleteWord, updateWord } = useVocabStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPdfImport, setShowPdfImport] = useState(false);
   const [newWord, setNewWord] = useState('');
@@ -16,6 +16,86 @@ export default function VocabList({ vocabSetId }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, word }
   const [isTranslating, setIsTranslating] = useState(false);
+
+  // Edit vocabulary states
+  const [editingWord, setEditingWord] = useState(null);
+  const [editWordText, setEditWordText] = useState('');
+  const [editPhoneticText, setEditPhoneticText] = useState('');
+  const [editMeaningText, setEditMeaningText] = useState('');
+  const [editEnglishDefinitionText, setEditEnglishDefinitionText] = useState('');
+
+  const startEdit = (vocab) => {
+    setEditingWord(vocab);
+    setEditWordText(vocab.word || '');
+    setEditPhoneticText(vocab.phonetic || '');
+    setEditMeaningText(vocab.meaningVi || '');
+    setEditEnglishDefinitionText(vocab.englishDefinition || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editWordText.trim()) {
+      toast.error('Vui lòng nhập từ tiếng Anh!');
+      return;
+    }
+    if (!editMeaningText.trim()) {
+      toast.error('Vui lòng nhập nghĩa tiếng Việt!');
+      return;
+    }
+
+    const result = await updateWord(vocabSetId, editingWord._id, {
+      word: editWordText.trim(),
+      phonetic: editPhoneticText.trim(),
+      meaningVi: editMeaningText.trim(),
+      englishDefinition: editEnglishDefinitionText.trim(),
+    });
+
+    if (result) {
+      toast.success('Đã cập nhật từ vựng thành công!');
+      setEditingWord(null);
+    } else {
+      toast.error('Lỗi khi cập nhật từ vựng.');
+    }
+  };
+
+  // Single AI definition generator
+  const [generatingSingleId, setGeneratingSingleId] = useState(null);
+
+  const handleGenerateSingleDefinition = async (vocab) => {
+    setGeneratingSingleId(vocab._id);
+    toast.info(`AI đang tạo định nghĩa tiếng Anh cho từ "${vocab.word}"...`);
+    try {
+      const prompt = `You are a professional lexicographer. For the English word "${vocab.word}" with Vietnamese meaning "${vocab.meaningVi}", write a very concise and simple English definition (1 short sentence, max 15 words) suitable for Vietnamese students learning English.
+Rules:
+1. Do not use the word "${vocab.word}" itself in the definition.
+2. Return ONLY the English definition itself as plain text. Do not include quotes, markdown wrappers, or explanation.`;
+
+      const { data } = await api.post('/ai/chat', {
+        messages: [{ role: 'user', content: prompt }]
+      });
+
+      const definition = data.message.content.trim();
+      
+      const result = await updateWord(vocabSetId, vocab._id, {
+        word: vocab.word,
+        phonetic: vocab.phonetic,
+        meaningVi: vocab.meaningVi,
+        exampleSentence: vocab.exampleSentence || '',
+        exampleMeaningVi: vocab.exampleMeaningVi || '',
+        englishDefinition: definition,
+      });
+
+      if (result) {
+        toast.success(`Đã tạo định nghĩa cho từ "${vocab.word}" thành công!`);
+      } else {
+        toast.error('Lỗi khi lưu định nghĩa.');
+      }
+    } catch (err) {
+      console.error('Error generating single definition:', err);
+      toast.error('Không thể tạo định nghĩa bằng AI.');
+    } finally {
+      setGeneratingSingleId(null);
+    }
+  };
 
   const handleSpeak = (text) => {
     if ('speechSynthesis' in window) {
@@ -279,12 +359,48 @@ Example output format:
                   </button>
                 </div>
                 <div className="vocab-word-meaning">{vocab.meaningVi}</div>
-                {vocab.englishDefinition && (
+                {vocab.englishDefinition ? (
                   <div className="vocab-word-definition" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic', marginTop: '0.125rem' }}>
                     Def: {vocab.englishDefinition}
                   </div>
+                ) : (
+                  <div className="vocab-word-no-definition" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#b45309', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                      <AlertCircle size={10} /> Thiếu định nghĩa Anh
+                    </span>
+                    <button 
+                      onClick={() => handleGenerateSingleDefinition(vocab)}
+                      disabled={generatingSingleId !== null}
+                      className="btn-ghost"
+                      style={{ fontSize: '0.65rem', padding: '1px 6px', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px', borderColor: 'var(--color-accent-primary)', color: 'var(--color-accent-primary)', background: 'var(--color-accent-glow)', cursor: 'pointer' }}
+                    >
+                      {generatingSingleId === vocab._id ? 'Đang tạo...' : '✨ Tạo nhanh bằng AI'}
+                    </button>
+                  </div>
                 )}
               </div>
+              <button
+                className="vocab-word-edit"
+                onClick={() => startEdit(vocab)}
+                title="Chỉnh sửa từ"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  marginRight: '0.25rem',
+                  flexShrink: 0
+                }}
+              >
+                <Edit3 size={14} />
+              </button>
               <button
                 className="vocab-word-delete"
                 onClick={() => setDeleteConfirm({ id: vocab._id, word: vocab.word })}
@@ -308,6 +424,66 @@ Example output format:
             <div className="custom-confirm-actions">
               <button onClick={confirmDelete} className="btn-danger-confirm">Xóa từ</button>
               <button onClick={() => setDeleteConfirm(null)} className="btn-ghost-confirm">Hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Word Dialog */}
+      {editingWord && (
+        <div className="custom-confirm-overlay animate-fade-in" style={{ zIndex: 1001 }}>
+          <div className="custom-confirm-card edit-vocab-card animate-scale-in" style={{ maxWidth: '520px', textAlign: 'left' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.25rem' }}>✏️ Chỉnh sửa từ vựng</h3>
+            
+            <div className="vocab-edit-fields" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Từ vựng *</label>
+                <input
+                  type="text"
+                  value={editWordText}
+                  onChange={(e) => setEditWordText(e.target.value)}
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Phiên âm</label>
+                <input
+                  type="text"
+                  value={editPhoneticText}
+                  onChange={(e) => setEditPhoneticText(e.target.value)}
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Nghĩa tiếng Việt *</label>
+                <input
+                  type="text"
+                  value={editMeaningText}
+                  onChange={(e) => setEditMeaningText(e.target.value)}
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Định nghĩa tiếng Anh</label>
+                <input
+                  type="text"
+                  value={editEnglishDefinitionText}
+                  onChange={(e) => setEditEnglishDefinitionText(e.target.value)}
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div className="custom-confirm-actions" style={{ marginTop: '1.5rem', justifyContent: 'flex-end', display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => setEditingWord(null)} className="btn-ghost-confirm">Hủy</button>
+              <button onClick={handleSaveEdit} className="btn-danger-confirm" style={{ background: 'var(--color-accent-primary)' }}>Lưu thay đổi</button>
             </div>
           </div>
         </div>
@@ -507,6 +683,12 @@ Example output format:
           background: rgba(239, 68, 68, 0.15);
           color: var(--color-error);
           border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .vocab-word-edit:hover {
+          background: var(--color-accent-glow);
+          color: var(--color-accent-primary);
+          border-color: rgba(16, 185, 129, 0.2);
         }
 
         /* Custom Delete Confirm Modal Styles */

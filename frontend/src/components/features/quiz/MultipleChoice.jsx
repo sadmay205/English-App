@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, ArrowRight, RotateCcw, Trophy, Volume2 } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowRight, RotateCcw, Trophy, Volume2, ArrowLeft } from 'lucide-react';
 import useQuizStore from '../../../store/useQuizStore';
 
 export default function MultipleChoice() {
-  const { questions, currentIndex, answers, score, isCompleted, showResult, submitAnswer, nextQuestion, submitQuiz, resetQuiz, timeLimit } = useQuizStore();
+  const { questions, currentIndex, answers, score, isCompleted, showResult, submitAnswer, nextQuestion, submitQuiz, resetQuiz, timeLimit, quizType } = useQuizStore();
   const [selectedOption, setSelectedOption] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [timeLeft, setTimeLeft] = useState(timeLimit);
@@ -106,13 +106,16 @@ export default function MultipleChoice() {
   const isCorrect = currentAnswer?.isCorrect;
 
   return (
-    <div className="mc-quiz animate-fade-in">
+    <div className="mc-quiz card glass animate-fade-in" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', maxWidth: '680px', margin: '0 auto', background: 'rgba(22, 22, 37, 0.92)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)' }}>
       {/* Progress bar */}
       <div className="mc-progress">
         <div className="mc-progress-bar" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
       </div>
-      <div className="mc-progress-text">
-        Câu {currentIndex + 1} / {questions.length}
+      <div className="mc-progress-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+        <button onClick={resetQuiz} className="btn-ghost mc-back-btn" style={{ padding: '0.375rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}>
+          <ArrowLeft size={14} /> Quay lại
+        </button>
+        <span>Câu {currentIndex + 1} / {questions.length}</span>
         {timeLimit !== null && (
           <span className={`mc-timer ${timeLeft < 10 ? 'urgent' : ''}`} style={{ fontWeight: 'bold' }}>
             ⏱️ {formatTime(timeLeft)}
@@ -133,7 +136,9 @@ export default function MultipleChoice() {
         {question.phonetic && (
           <p className="mc-question-phonetic">{question.phonetic}</p>
         )}
-        <p className="mc-question-label">Chọn nghĩa tiếng Việt đúng:</p>
+        <p className="mc-question-label">
+          {quizType === 'multiple-choice-en' ? 'Chọn định nghĩa tiếng Anh đúng:' : 'Chọn nghĩa tiếng Việt đúng:'}
+        </p>
       </div>
 
       {/* Options Grid */}
@@ -218,6 +223,15 @@ const quizStyles = `
     font-size: 0.75rem;
     color: var(--color-text-muted);
     margin-bottom: 1.5rem;
+  }
+
+  .mc-exit-btn {
+    color: var(--color-text-muted);
+    transition: color 0.2s;
+  }
+
+  .mc-exit-btn:hover {
+    color: var(--color-error) !important;
   }
 
   .mc-score {
@@ -396,8 +410,14 @@ const resultStyles = `
     align-items: center;
     justify-content: center;
     padding: 3rem 2rem;
-    max-width: 400px;
+    max-width: 440px;
     margin: 2rem auto;
+    background: rgba(22, 22, 37, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   }
 
   .quiz-result-icon {

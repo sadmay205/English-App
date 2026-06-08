@@ -27,11 +27,15 @@ export default function FlashcardStudy() {
   const isFlippedRef = useRef(isFlipped);
   const handleMarkWrongRef = useRef(null);
   const handleMarkCorrectRef = useRef(null);
+  const handlePrevCardRef = useRef(null);
+  const handleNextCardRef = useRef(null);
 
   useEffect(() => {
     isFlippedRef.current = isFlipped;
     handleMarkWrongRef.current = handleMarkWrong;
     handleMarkCorrectRef.current = handleMarkCorrect;
+    handlePrevCardRef.current = handlePrevCard;
+    handleNextCardRef.current = handleNextCard;
   });
 
   // Keyboard controls
@@ -51,10 +55,16 @@ export default function FlashcardStudy() {
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         setIsFlipped((prev) => !prev);
-      } else if (e.key === 'ArrowLeft' || e.key === '1') {
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrevCardRef.current();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNextCardRef.current();
+      } else if (e.key === '1') {
         e.preventDefault();
         handleMarkWrongRef.current();
-      } else if (e.key === 'ArrowRight' || e.key === '2') {
+      } else if (e.key === '2') {
         e.preventDefault();
         handleMarkCorrectRef.current();
       }
@@ -83,10 +93,9 @@ export default function FlashcardStudy() {
   };
 
   const startSession = (wordsList) => {
-    // Shuffle words
-    const shuffled = [...wordsList].sort(() => Math.random() - 0.5);
-    setQueue(shuffled);
-    setTotalCount(shuffled.length);
+    // Keep words in order (no shuffle)
+    setQueue(wordsList);
+    setTotalCount(wordsList.length);
     setCurrentIdx(0);
     setIsFlipped(false);
     setWrongAttempts({});
@@ -120,21 +129,54 @@ export default function FlashcardStudy() {
     }
   };
 
+  const handlePrevCard = () => {
+    if (swipeDirection) return;
+    if (currentIdx > 0) {
+      setSwipeDirection('prev');
+      setTimeout(() => {
+        setCurrentIdx((prev) => prev - 1);
+        setIsFlipped(false);
+        setSwipeDirection(null);
+      }, 300);
+    }
+  };
+
+  const handleNextCard = () => {
+    if (swipeDirection) return;
+    if (currentIdx < totalCount - 1) {
+      setSwipeDirection('next');
+      setTimeout(() => {
+        setCurrentIdx((prev) => prev + 1);
+        setIsFlipped(false);
+        setSwipeDirection(null);
+      }, 300);
+    } else if (currentIdx === totalCount - 1) {
+      setSwipeDirection('next');
+      setTimeout(() => {
+        setCurrentIdx(totalCount);
+        setIsFlipped(false);
+        setSwipeDirection(null);
+      }, 300);
+    }
+  };
+
   const handleMarkCorrect = () => {
     if (swipeDirection) return; // Prevent double trigger
-    const currentCard = queue[0];
+    const currentCard = queue[currentIdx];
     if (!currentCard) return;
 
     // If it was never marked failed, it is mastered perfectly
     if (!failedList.includes(currentCard._id)) {
-      setMasteredList(prev => [...prev, currentCard]);
+      setMasteredList(prev => {
+        if (prev.some(v => v._id === currentCard._id)) return prev;
+        return [...prev, currentCard];
+      });
     }
     
     setSwipeDirection('right');
     
     // Smooth delay to transition to next card after swipe animation completes
     setTimeout(() => {
-      setQueue((prev) => prev.slice(1));
       setCurrentIdx((prev) => prev + 1);
       setIsFlipped(false);
       setSwipeDirection(null);
@@ -143,13 +185,14 @@ export default function FlashcardStudy() {
 
   const handleMarkWrong = () => {
     if (swipeDirection) return; // Prevent double trigger
-    const currentCard = queue[0];
+    const currentCard = queue[currentIdx];
     if (!currentCard) return;
     
     // Add to failedList if not already there
     if (!failedList.includes(currentCard._id)) {
       setFailedList(prev => [...prev, currentCard._id]);
     }
+    setMasteredList(prev => prev.filter(v => v._id !== currentCard._id));
 
     // Increment wrong attempts for stats
     setWrongAttempts((prev) => ({
@@ -159,12 +202,8 @@ export default function FlashcardStudy() {
 
     setSwipeDirection('left');
     
-    // Leitner repeat: move failed card to the end of the queue
     setTimeout(() => {
-      setQueue((prev) => {
-        const nextQueue = prev.slice(1);
-        return [...nextQueue, currentCard];
-      });
+      setCurrentIdx((prev) => prev + 1);
       setIsFlipped(false);
       setSwipeDirection(null);
     }, 300);
@@ -293,7 +332,7 @@ export default function FlashcardStudy() {
   }
 
   // View 3: Completed Session / Stats Summary
-  if (studying && queue.length === 0) {
+  if (studying && currentIdx >= totalCount && totalCount > 0) {
     const accuracy = totalCount > 0 
       ? Math.round(((totalCount - failedList.length) / totalCount) * 100)
       : 100;
@@ -369,7 +408,7 @@ export default function FlashcardStudy() {
   }
 
   // View 4: Study Session view
-  const currentCard = queue[0];
+  const currentCard = queue[currentIdx];
   const progressPercent = totalCount > 0 ? Math.round((currentIdx / totalCount) * 100) : 0;
 
   if (selectedSetId && isLoading) {
@@ -401,7 +440,7 @@ export default function FlashcardStudy() {
         </button>
         <div className="progress-details">
           <span>Đang học: <strong>{currentIdx + 1} / {totalCount}</strong></span>
-          <span>Còn lại trong hàng đợi: <strong>{queue.length}</strong></span>
+          <span>Còn lại: <strong>{Math.max(0, totalCount - currentIdx)}</strong></span>
         </div>
       </div>
 
@@ -484,25 +523,46 @@ export default function FlashcardStudy() {
 
       {/* Keyboard shortcut legend */}
       <div className="shortcut-legend">
-        <span>⌨️ Phím tắt: <strong>[Space]</strong> Lật thẻ | <strong>[←]</strong> hoặc <strong>[1]</strong> Chưa thuộc | <strong>[→]</strong> hoặc <strong>[2]</strong> Đã thuộc</span>
+        <span>⌨️ Phím tắt: <strong>[Space]</strong> Lật thẻ | <strong>[←]</strong> Quay lại | <strong>[→]</strong> Tiếp theo | <strong>[1]</strong> Chưa thuộc | <strong>[2]</strong> Đã thuộc</span>
       </div>
 
-      {/* Control Buttons */}
-      <div className="study-controls">
-        {!isFlipped ? (
-          <button onClick={() => setIsFlipped(true)} className="btn-primary btn-flip-action">
-            Lật thẻ để xem từ
+      {/* Control Buttons & Navigation */}
+      <div className="study-controls-container">
+        <div className="study-navigation-row">
+          <button 
+            onClick={handlePrevCard} 
+            className="btn-nav" 
+            disabled={currentIdx === 0}
+            title="Quay lại thẻ trước (ArrowLeft)"
+          >
+            ← Quay lại
           </button>
-        ) : (
-          <div className="action-buttons-row animate-scale-in">
-            <button onClick={handleMarkWrong} className="btn-wrong-action">
-              ❌ Chưa thuộc
-            </button>
-            <button onClick={handleMarkCorrect} className="btn-correct-action">
-              ✅ Đã thuộc
-            </button>
+
+          <div className="study-main-actions">
+            {!isFlipped ? (
+              <button onClick={() => setIsFlipped(true)} className="btn-primary btn-flip-action">
+                Lật thẻ để xem từ
+              </button>
+            ) : (
+              <div className="action-buttons-row animate-scale-in">
+                <button onClick={handleMarkWrong} className="btn-wrong-action">
+                  ❌ Chưa thuộc
+                </button>
+                <button onClick={handleMarkCorrect} className="btn-correct-action">
+                  ✅ Đã thuộc
+                </button>
+              </div>
+            )}
           </div>
-        )}
+
+          <button 
+            onClick={handleNextCard} 
+            className="btn-nav"
+            title="Thẻ tiếp theo (ArrowRight)"
+          >
+            Tiếp theo →
+          </button>
+        </div>
       </div>
 
       <style>{styles}</style>
@@ -946,6 +1006,16 @@ const styles = `
     pointer-events: none;
   }
 
+  .flashcard-wrapper.swipe-prev {
+    animation: swipeRight 0.3s forwards cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: none;
+  }
+
+  .flashcard-wrapper.swipe-next {
+    animation: swipeLeft 0.3s forwards cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: none;
+  }
+
   .flashcard-inner {
     position: relative;
     width: 100%;
@@ -1143,10 +1213,50 @@ const styles = `
     margin-bottom: 1.25rem;
   }
 
-  .study-controls {
+  .study-controls-container {
+    width: 100%;
+  }
+
+  .study-navigation-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+  }
+
+  .study-main-actions {
+    flex: 1;
     display: flex;
     justify-content: center;
-    width: 100%;
+  }
+
+  .btn-nav {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border-default);
+    color: var(--color-text-primary);
+    padding: 0.875rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  .btn-nav:hover:not(:disabled) {
+    border-color: var(--color-accent-secondary);
+    background: var(--color-accent-glow);
+    color: var(--color-accent-secondary);
+  }
+
+  .btn-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   .btn-flip-action {

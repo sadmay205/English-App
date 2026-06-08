@@ -7,7 +7,7 @@ const useQuizStore = create((set, get) => ({
   currentIndex: 0,
   answers: [],
   score: 0,
-  quizType: 'multiple-choice',
+  quizType: 'multiple-choice-vie',
   setTitle: '',
   setId: null,
   isLoading: false,
@@ -18,7 +18,7 @@ const useQuizStore = create((set, get) => ({
   timeLimit: null,
 
   // Generate a quiz
-  generateQuiz: async (setId, type = 'multiple-choice', count = 10, timeLimit = null) => {
+  generateQuiz: async (setId, type = 'multiple-choice-vie', count = 10, timeLimit = null) => {
     set({ isLoading: true, error: null, isCompleted: false, showResult: false, timeLimit });
     try {
       const { data } = await api.get(`/quiz/generate/${setId}?type=${type}&count=${count}`);
@@ -41,6 +41,34 @@ const useQuizStore = create((set, get) => ({
     }
   },
 
+  // Generate a custom quiz
+  generateCustomQuiz: async (setId, config, wordIds, timeLimit = null) => {
+    set({ isLoading: true, error: null, isCompleted: false, showResult: false, timeLimit });
+    try {
+      const { data } = await api.post('/quiz/generate-custom', {
+        setId,
+        wordIds,
+        typesConfig: config,
+        timeLimit,
+      });
+      set({
+        questions: data.questions,
+        currentIndex: 0,
+        answers: new Array(data.questions.length).fill(null),
+        score: 0,
+        quizType: 'custom',
+        setTitle: data.setTitle,
+        setId,
+        isLoading: false,
+        isCompleted: false,
+      });
+      return data;
+    } catch (error) {
+      set({ error: error.response?.data?.message || 'Lỗi khi tạo bài kiểm tra tùy chỉnh', isLoading: false });
+      return null;
+    }
+  },
+
   // Submit an answer for current question
   submitAnswer: (answerValue) => {
     const { questions, currentIndex, answers, score } = get();
@@ -49,9 +77,9 @@ const useQuizStore = create((set, get) => ({
 
     let isCorrect = false;
 
-    if (question.type === 'multiple-choice') {
+    if (question.type === 'multiple-choice-vie' || question.type === 'multiple-choice-en') {
       isCorrect = answerValue === question.correctIndex;
-    } else if (question.type === 'fill-blank') {
+    } else if (question.type === 'fill-blank' || question.type === 'fill-blank-en') {
       isCorrect = answerValue.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
     }
 
@@ -59,7 +87,7 @@ const useQuizStore = create((set, get) => ({
     newAnswers[currentIndex] = {
       value: answerValue,
       isCorrect,
-      correctAnswer: question.type === 'multiple-choice' ? question.correctAnswer : question.correctAnswer,
+      correctAnswer: question.correctAnswer,
     };
 
     set({

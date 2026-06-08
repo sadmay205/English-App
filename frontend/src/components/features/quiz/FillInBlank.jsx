@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, XCircle, ArrowRight, RotateCcw, Trophy, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowRight, RotateCcw, Trophy, Eye, ArrowLeft } from 'lucide-react';
 import useQuizStore from '../../../store/useQuizStore';
 
 export default function FillInBlank() {
-  const { questions, currentIndex, answers, score, isCompleted, showResult, submitAnswer, nextQuestion, submitQuiz, resetQuiz, timeLimit } = useQuizStore();
+  const { questions, currentIndex, answers, score, isCompleted, showResult, submitAnswer, nextQuestion, submitQuiz, resetQuiz, timeLimit, quizType } = useQuizStore();
   const [userInput, setUserInput] = useState('');
   const [answered, setAnswered] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -83,7 +83,7 @@ export default function FillInBlank() {
     const grade = getGrade();
 
     return (
-      <div className="fill-result animate-scale-in">
+      <div className="fill-result card glass animate-scale-in" style={{ padding: '3rem 2rem', borderRadius: 'var(--radius-lg)', maxWidth: '440px', margin: '2rem auto', background: 'rgba(22, 22, 37, 0.92)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)' }}>
         <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>{grade.emoji}</div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: grade.color, marginBottom: '1rem' }}>{grade.text}</h2>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', marginBottom: '1.5rem' }}>
@@ -102,13 +102,16 @@ export default function FillInBlank() {
   const isCorrect = currentAnswer?.isCorrect;
 
   return (
-    <div className="fill-quiz animate-fade-in">
+    <div className="fill-quiz card glass animate-fade-in" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', maxWidth: '680px', margin: '0 auto', background: 'rgba(22, 22, 37, 0.92)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)' }}>
       {/* Progress */}
       <div className="fill-progress">
         <div className="fill-progress-bar" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
       </div>
-      <div className="fill-progress-text">
-        Câu {currentIndex + 1} / {questions.length}
+      <div className="fill-progress-text" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+        <button onClick={resetQuiz} className="btn-ghost fill-back-btn" style={{ padding: '0.375rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem' }}>
+          <ArrowLeft size={14} /> Quay lại
+        </button>
+        <span>Câu {currentIndex + 1} / {questions.length}</span>
         {timeLimit !== null && (
           <span className={`fill-timer ${timeLeft < 10 ? 'urgent' : ''}`} style={{ fontWeight: 'bold' }}>
             ⏱️ {formatTime(timeLeft)}
@@ -120,7 +123,9 @@ export default function FillInBlank() {
 
       {/* Question */}
       <div className="fill-question card">
-        <p className="fill-meaning">{question.meaningVi}</p>
+        <p className="fill-meaning">
+          {quizType === 'fill-blank-en' ? question.englishDefinition : question.meaningVi}
+        </p>
         <p className="fill-hint-label">Gợi ý: <span className="fill-hint-text">{question.hint}</span> ({question.wordLength} ký tự)</p>
         {question.phonetic && (
           <p className="fill-phonetic">{question.phonetic}</p>
@@ -208,6 +213,15 @@ export default function FillInBlank() {
           font-size: 0.75rem;
           color: var(--color-text-muted);
           margin-bottom: 1.5rem;
+        }
+
+        .fill-exit-btn {
+          color: var(--color-text-muted);
+          transition: color 0.2s;
+        }
+
+        .fill-exit-btn:hover {
+          color: var(--color-error) !important;
         }
 
         .fill-timer {
