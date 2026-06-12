@@ -8,6 +8,7 @@ import ListeningContainer from '../features/listening/ListeningContainer';
 import ProgressDashboard from '../features/progress/ProgressView';
 import SmartStudy from '../features/vocab/SmartStudy';
 import FlashcardStudy from '../features/vocab/FlashcardStudy';
+import GamesContainer from '../features/games/GamesContainer';
 import { Brain, Headphones, TrendingUp, Palette, Upload, Check } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -33,6 +34,10 @@ function ListeningView() {
   return <ListeningContainer />;
 }
 
+function GamesView() {
+  return <GamesContainer />;
+}
+
 function ProgressView() {
   return <ProgressDashboard />;
 }
@@ -43,6 +48,7 @@ const viewMap = {
   flashcard: FlashcardView,
   quiz: QuizView,
   listening: ListeningView,
+  games: GamesView,
   progress: ProgressView,
 };
 

@@ -1,10 +1,10 @@
-# 📚 Web Học Tiếng Anh Thông Minh (EnglishAI)
+# 📚 Web Học Tiếng Anh Thông Minh (EnglishAI) - Phiên bản v4.2
 
 Chào mừng bạn đến với **EnglishAI** - Hệ thống học từ vựng, luyện nghe tích hợp AI Chatbot (sử dụng OpenRouter API). Đây là một ứng dụng full-stack hiện đại được xây dựng nhằm tối ưu hóa trải nghiệm học tập tiếng Anh thông qua phản xạ thông minh và hỗ trợ gia sư ảo thời gian thực.
 
 ---
 
-## 🚀 Tính năng nổi bật
+## 🚀 Tính năng nổi bật (Bản cập nhật v4.2)
 
 1. **Quản lý Bộ từ vựng & Nhập từ PDF**: Lưu trữ, phân nhóm từ vựng và tự động bóc tách từ `[Từ vựng - Phiên âm - Nghĩa]` từ các tệp PDF tài liệu học tập.
 2. **Học thông minh (Smart Repetition)**: Thuật toán Leitner tự động đưa các từ trả lời sai lặp lại nhiều lần cho đến khi thuộc lòng.
@@ -13,13 +13,16 @@ Chào mừng bạn đến với **EnglishAI** - Hệ thống học từ vựng, 
    - Biên soạn định nghĩa tiếng Anh tự động bằng AI (`google/gemini-3.5-flash` qua OpenRouter) chỉ bằng một cú click chuột.
    - Hỗ trợ phím tắt học tập nhanh và tối ưu hóa phản xạ.
 4. **Luyện nghe đoạn văn**: Tự động phân tách đoạn văn trực tuyến thành từng câu riêng biệt và phát âm giọng đọc để học viên nghe & gõ hoàn chỉnh câu.
-5. **Kiểm tra Tùy chỉnh (Custom Quiz Builder)**:
-   - Giao diện thiết lập bài kiểm tra riêng biệt, trực quan nổi trên hình nền background.
-   - Hỗ trợ tạo bài test kết hợp nhiều dạng câu hỏi: Trắc nghiệm (Việt/Anh), Điền từ (Việt/Anh) và Ghép từ (Việt/Anh).
-   - Cho phép tùy chọn giới hạn thời gian làm bài, lọc chọn chính xác danh sách từ vựng muốn ôn tập.
-   - Quy trình làm bài 2 giai đoạn:
-     - **Giai đoạn 1 (Làm câu hỏi lẻ)**: Làm các câu hỏi trắc nghiệm và điền từ vào chỗ trống (kiểm tra không phân biệt chữ hoa/thường).
-     - **Giai đoạn 2 (Trò chơi Ghép thẻ)**: Bảng ghép thẻ nối từ tiếng Anh với nghĩa tiếng Việt hoặc định nghĩa tiếng Anh tương ứng.
+5. **Nâng cấp Hệ thống trò chơi Ghép từ (Ghép cặp & Phản xạ)**:
+   - **Trò chơi Ghép cặp từ vựng (Tab Trò chơi - Games)**:
+     - **Tùy chọn số lượng từ**: Hộp chọn (Dropdown) cho phép thiết lập chơi từ **4 từ (8 thẻ) đến 20 từ (40 thẻ)**.
+     - **Giao diện thẻ 3D Glassmorphism**: Thẻ khi úp hiển thị vòng tròn lấp lánh cùng icon phát sáng (`Sparkles`) pulsing động. Thẻ khi lật hiển thị các icon minh họa sinh động (`Zap`, `Compass`, `Star`,...) theo mã màu pastel gradient riêng biệt.
+     - **Hiệu ứng âm thanh sinh động (Web Audio API)**: Tích hợp âm thanh khi lật thẻ, nhạc chuông vui tươi khi ghép thành công, âm trầm khi chọn sai và nhạc thắng cuộc.
+     - **Nhạc nền BGM du dương**: Nhạc nền Lofi synth 8-bit nhẹ nhàng được tổng hợp hoàn toàn bằng code, có nút bật/tắt (mute) chống làm phiền.
+     - **Bố cục lưới Grid tự động**: Sử dụng thuộc tính `auto-fill` căn chỉnh thẻ luôn vuông vức và cân đối trên mọi kích thước màn hình.
+   - **Trò chơi Ghép thẻ (Tab Kiểm tra - Quiz)**:
+     - Cho phép chọn chính xác số từ muốn kiểm tra từ **4 -> 20 từ** thông qua thanh trượt (slider) và nút bấm tăng/giảm nhanh `-`/`+`.
+     - Thẻ nối trực tiếp từ tiếng Anh sang nghĩa tiếng Việt/Định nghĩa tiếng Anh với thiết kế kính mờ, bo góc phát sáng và tích hợp nút loa phát âm độc lập.
 6. **AI Chatbot Panel (Cột phải)**: Trợ lý ảo gia sư tiếng Anh luôn sẵn sàng giải thích ngữ pháp, sửa lỗi viết câu và giải đáp thắc mắc mọi lúc.
 
 ---
@@ -49,7 +52,7 @@ Dự án được chia làm hai phần rõ rệt:
 Tạo file `.env` trong thư mục `backend/` với các giá trị sau:
 ```env
 PORT=5000
-MONGO_URI=mongodb://localhost:27001/english-app  # Thay bằng URI MongoDB của bạn
+MONGO_URI=mongodb+srv://...  # Thay bằng URI MongoDB của bạn
 JWT_SECRET=your_super_secret_jwt_key
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
@@ -94,11 +97,11 @@ VITE_API_URL=http://localhost:5000/api
    ```bash
    npm run dev
    ```
-   *Frontend sẽ chạy tại `http://localhost:5173` (hoặc cổng trống tiếp theo)*
+   *Frontend sẽ chạy tại `http://localhost:5173`*
 
 4. Để build sản phẩm cho môi trường production:
-   ```bash
-   npm.cmd run build
+   ```cmd
+   npm run build
    ```
 
 ---
@@ -137,7 +140,6 @@ Chúng tôi sử dụng **Node.js Native Test Runner** (tích hợp sẵn từ N
    - Sử dụng `[Arrow Left / 1]` và `[Arrow Right / 2]` để đánh giá thẻ. Đảm bảo thẻ chưa thuộc được xoay vòng lặp lại ở cuối hàng đợi học.
 2. **Kiểm tra tải PDF**:
    - Tải lên tệp PDF từ vựng mẫu (ví dụ tệp PDF SQL đính kèm ở thư mục gốc). Đảm bảo dữ liệu được bóc tách chính xác thành từ vựng, phiên âm và nghĩa.
-3. **Kiểm tra Custom Quiz**:
+3. **Kiểm tra Custom Quiz & Game**:
    - Vào mục "Kiểm tra", chọn "Kiểm tra Tùy chỉnh".
-   - Thiết lập số câu hỏi mỗi loại (Trắc nghiệm, Điền từ, Ghép từ), chọn bộ từ vựng và chọn giới hạn thời gian.
-   - Tiến hành kiểm tra và hoàn tất giai đoạn làm bài trắc nghiệm/điền từ, sau đó nối thẻ ở phần ghép từ để xác minh cơ chế cộng dồn điểm số và ghi nhận cơ sở dữ liệu.
+   - Chọn bộ từ vựng và số lượng câu trắc nghiệm/điền từ/ghép từ và kiểm tra âm thanh lật/chuông đúng sai của game.

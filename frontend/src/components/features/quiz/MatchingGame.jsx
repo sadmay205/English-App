@@ -1,7 +1,237 @@
 import { useState, useEffect } from 'react';
-import { RotateCcw, Trophy, CheckCircle, Clock, LogOut } from 'lucide-react';
+import { 
+  RotateCcw, Trophy, CheckCircle, Clock, LogOut, Volume2, VolumeX,
+  Sparkles, BookOpen, Compass, Star, Zap, Smile, Heart, Flame,
+  Globe, Sun, Moon, Feather, Award, Gift, Target, Shield, HelpCircle
+} from 'lucide-react';
 import useQuizStore from '../../../store/useQuizStore';
 import { toast } from 'sonner';
+
+// Sound synthesis using Web Audio API
+class SoundEffects {
+  constructor() {
+    this.ctx = null;
+    this.bgmGain = null;
+    this.isPlayingBgm = false;
+    this.bgmTimeout = null;
+  }
+
+  init() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  playFlip() {
+    try {
+      this.init();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(320, this.ctx.currentTime + 0.12);
+      
+      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.12);
+    } catch (e) {}
+  }
+
+  playMatchSuccess() {
+    try {
+      this.init();
+      const now = this.ctx.currentTime;
+      
+      const playTone = (freq, delay, duration) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + delay);
+        
+        gain.gain.setValueAtTime(0.12, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + duration);
+        
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.start(now + delay);
+        osc.stop(now + delay + duration);
+      };
+      
+      playTone(523.25, 0, 0.18); // C5
+      playTone(659.25, 0.08, 0.3); // E5
+    } catch (e) {}
+  }
+
+  playMatchFail() {
+    try {
+      this.init();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(170, this.ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(90, this.ctx.currentTime + 0.22);
+      
+      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.22);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.22);
+    } catch (e) {}
+  }
+
+  playWin() {
+    try {
+      this.init();
+      const now = this.ctx.currentTime;
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        
+        gain.gain.setValueAtTime(0.12, now + idx * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.06 + 0.35);
+        
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.4);
+      });
+    } catch (e) {}
+  }
+
+  startBgm() {
+    try {
+      this.init();
+      if (this.isPlayingBgm) return;
+      this.isPlayingBgm = true;
+
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+      this.bgmGain.connect(this.ctx.destination);
+
+      const playBeats = () => {
+        if (!this.isPlayingBgm) return;
+        const now = this.ctx.currentTime;
+        
+        const chords = [
+          [220.00, 261.63, 329.63], // Am
+          [174.61, 220.00, 261.63], // F
+          [261.63, 329.63, 392.00], // C
+          [196.00, 246.94, 293.66]  // G
+        ];
+        
+        const chordDuration = 4.0;
+        
+        chords.forEach((chord, chordIdx) => {
+          const chordStartTime = now + chordIdx * chordDuration;
+          
+          chord.forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, chordStartTime);
+            
+            gain.gain.setValueAtTime(0, chordStartTime);
+            gain.gain.linearRampToValueAtTime(0.015, chordStartTime + 0.5);
+            gain.gain.linearRampToValueAtTime(0.015, chordStartTime + chordDuration - 0.5);
+            gain.gain.linearRampToValueAtTime(0, chordStartTime + chordDuration);
+            
+            osc.connect(gain);
+            gain.connect(this.bgmGain);
+            
+            osc.start(chordStartTime);
+            osc.stop(chordStartTime + chordDuration);
+          });
+          
+          const arpeggio = [0, 2, 1, 2];
+          arpeggio.forEach((noteIdx, stepIdx) => {
+            const stepTime = chordStartTime + stepIdx * 1.0;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(chord[noteIdx] * 2, stepTime);
+            
+            gain.gain.setValueAtTime(0, stepTime);
+            gain.gain.linearRampToValueAtTime(0.025, stepTime + 0.25);
+            gain.gain.exponentialRampToValueAtTime(0.001, stepTime + 0.85);
+            
+            osc.connect(gain);
+            gain.connect(this.bgmGain);
+            
+            osc.start(stepTime);
+            osc.stop(stepTime + 0.9);
+          });
+        });
+        
+        this.bgmTimeout = setTimeout(playBeats, chordDuration * chords.length * 1000);
+      };
+
+      playBeats();
+    } catch (e) {}
+  }
+
+  stopBgm() {
+    this.isPlayingBgm = false;
+    if (this.bgmTimeout) {
+      clearTimeout(this.bgmTimeout);
+    }
+    if (this.bgmGain) {
+      try {
+        this.bgmGain.disconnect();
+      } catch (e) {}
+    }
+  }
+}
+
+const sound = new SoundEffects();
+
+const DECORATIVE_ICONS = [
+  Sparkles, BookOpen, Compass, Star, Zap, Smile, Heart, Flame,
+  Globe, Sun, Moon, Feather, Award, Gift, Target, Shield, HelpCircle
+];
+
+const ICON_COLORS = [
+  '#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#ef4444', 
+  '#06b6d4', '#f43f5e', '#14b8a6', '#f59e0b', '#a855f7', '#6366f1'
+];
+
+const getCardIcon = (text, id) => {
+  const str = (text || '') + (id || '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % DECORATIVE_ICONS.length;
+  const colorIndex = Math.abs(hash) % ICON_COLORS.length;
+  const IconComponent = DECORATIVE_ICONS[index];
+  const color = ICON_COLORS[colorIndex];
+  
+  return (
+    <div className="card-decor-badge" style={{ backgroundColor: `${color}15`, border: `1px solid ${color}30`, color }}>
+      <IconComponent size={15} />
+    </div>
+  );
+};
 
 export default function MatchingGame() {
   const { questions, score, isCompleted, showResult, submitQuiz, resetQuiz, timeLimit, quizType } = useQuizStore();
@@ -16,6 +246,7 @@ export default function MatchingGame() {
   const [timeSpent, setTimeSpent] = useState(0);
   const [timeLeft, setTimeLeft] = useState(timeLimit);
   const [gameFinished, setGameFinished] = useState(false);
+  const [bgmMuted, setBgmMuted] = useState(true);
 
   // Shuffle array utility
   const shuffle = (array) => {
@@ -26,6 +257,16 @@ export default function MatchingGame() {
     }
     return arr;
   };
+
+  // Sync background music state
+  useEffect(() => {
+    if (!bgmMuted && !gameFinished) {
+      sound.startBgm();
+    } else {
+      sound.stopBgm();
+    }
+    return () => sound.stopBgm();
+  }, [bgmMuted, gameFinished]);
 
   // Initialize cards
   useEffect(() => {
@@ -74,6 +315,8 @@ export default function MatchingGame() {
   const handleCardClick = (card) => {
     if (matchedIds.has(card.id) || failedIds.has(card.id)) return;
 
+    sound.playFlip();
+
     // If no card is selected, select it
     if (!selectedCard) {
       setSelectedCard(card);
@@ -97,6 +340,7 @@ export default function MatchingGame() {
 
     if (selectedCard.id === card.id) {
       // Match success!
+      sound.playMatchSuccess();
       const newMatched = new Set(matchedIds);
       newMatched.add(card.id);
       setMatchedIds(newMatched);
@@ -115,6 +359,7 @@ export default function MatchingGame() {
       }
     } else {
       // Match failed
+      sound.playMatchFail();
       const pair = [selectedCard.id, card.id];
       setFailedIds(new Set(pair));
       setSelectedCard(null);
@@ -136,8 +381,12 @@ export default function MatchingGame() {
 
   const finishGame = async (isTimeOut = false) => {
     setGameFinished(true);
+    sound.stopBgm();
+    if (!isTimeOut) {
+      sound.playWin();
+    }
+    
     // Calculate final score
-    // Max score is questions.length. Subtract 1 point for every 3 errors, down to a minimum score of 1.
     const errors = Math.max(0, attempts - matchedIds.size);
     const finalScore = isTimeOut 
       ? Math.max(1, matchedIds.size) 
@@ -206,7 +455,17 @@ export default function MatchingGame() {
           </button>
           <h3>🧩 Trò chơi ghép từ</h3>
         </div>
-        <div className="match-header-stats">
+        <div className="match-header-stats" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Audio toggle button */}
+          <button 
+            onClick={() => setBgmMuted(!bgmMuted)} 
+            className="matching-audio-toggle-btn-quiz"
+            title={bgmMuted ? "Bật nhạc nền" : "Tắt nhạc nền"}
+          >
+            {bgmMuted ? <VolumeX size={14} /> : <Volume2 size={14} className="beat-animation" />}
+            <span>{bgmMuted ? "Nhạc" : "Nhạc"}</span>
+          </button>
+
           {timeLimit !== null && (
             <div className={`match-timer ${timeLeft < 10 ? 'urgent' : ''}`}>
               ⏱️ Hạn giờ: {formatTime(timeLeft)}
@@ -234,15 +493,31 @@ export default function MatchingGame() {
               else if (isFailed) cardClass += " failed";
 
               return (
-                <button
+                <div
                   key={`eng-${card.id}`}
                   className={cardClass}
                   onClick={() => handleCardClick(card)}
-                  disabled={isMatched}
+                  style={{ pointerEvents: isMatched ? 'none' : 'auto' }}
                 >
-                  {card.text}
-                  {isMatched && <CheckCircle size={14} className="match-check-icon" />}
-                </button>
+                  <div className="card-content-left">
+                    {getCardIcon(card.text, card.id)}
+                    <span className="card-word-text">{card.text}</span>
+                  </div>
+                  <div className="card-content-right">
+                    <button 
+                      type="button"
+                      className="card-audio-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speak(card.text);
+                      }}
+                      title="Phát âm"
+                    >
+                      <Volume2 size={13} />
+                    </button>
+                    {isMatched && <CheckCircle size={14} className="match-check-icon" />}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -265,15 +540,20 @@ export default function MatchingGame() {
               else if (isFailed) cardClass += " failed";
 
               return (
-                <button
+                <div
                   key={`vie-${card.id}`}
                   className={cardClass}
                   onClick={() => handleCardClick(card)}
-                  disabled={isMatched}
+                  style={{ pointerEvents: isMatched ? 'none' : 'auto' }}
                 >
-                  {card.text}
-                  {isMatched && <CheckCircle size={14} className="match-check-icon" />}
-                </button>
+                  <div className="card-content-left">
+                    {getCardIcon(card.text, card.id)}
+                    <span className="card-word-text">{card.text}</span>
+                  </div>
+                  <div className="card-content-right">
+                    {isMatched && <CheckCircle size={14} className="match-check-icon" />}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -314,6 +594,35 @@ const gameStyles = `
     align-items: center;
     gap: 1.25rem;
     font-size: 0.8125rem;
+  }
+
+  .matching-audio-toggle-btn-quiz {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .matching-audio-toggle-btn-quiz:hover {
+    border-color: var(--color-accent-primary);
+    color: var(--color-accent-primary);
+  }
+
+  .beat-animation {
+    animation: heartbeat 1s infinite alternate;
+  }
+
+  @keyframes heartbeat {
+    from { transform: scale(1); }
+    to { transform: scale(1.15); }
   }
 
   .match-timer {
@@ -367,24 +676,74 @@ const gameStyles = `
   }
 
   .match-card {
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-md);
-    padding: 0.875rem 1rem;
+    background: rgba(30, 30, 50, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 0.875rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--color-text-primary);
     cursor: pointer;
-    text-align: left;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-family: inherit;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     white-space: normal;
     word-break: break-word;
     line-height: 1.4;
+    user-select: none;
+  }
+
+  .card-content-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card-content-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .card-decor-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
+
+  .card-word-text {
+    font-weight: 600;
+  }
+
+  .card-audio-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .card-audio-btn:hover {
+    background: var(--color-accent-glow);
+    color: var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
+    transform: scale(1.1);
   }
 
   .match-exit-btn {
@@ -408,32 +767,36 @@ const gameStyles = `
     border-color: var(--color-error);
   }
 
-  .match-card:hover:not(:disabled) {
-    border-color: var(--color-border-accent);
-    transform: translateY(-1px);
-    background: var(--color-bg-hover);
+  .match-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    background: rgba(45, 45, 75, 0.7);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   }
 
   .match-card.selected {
     border-color: var(--color-accent-primary);
-    background: var(--color-accent-glow);
-    color: var(--color-accent-primary);
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+    background: rgba(16, 185, 129, 0.15);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+    transform: translateY(-2px) scale(1.02);
   }
 
   .match-card.matched {
     border-color: var(--color-success);
-    background: rgba(34, 197, 94, 0.08);
+    background: rgba(34, 197, 94, 0.12);
     color: var(--color-success);
-    opacity: 0.6;
-    cursor: default;
+    opacity: 0.5;
     text-decoration: line-through;
+    box-shadow: none;
+    transform: none;
   }
 
   .match-card.failed {
     border-color: var(--color-error);
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--color-error);
+    background: rgba(239, 68, 68, 0.2);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.35);
     animation: shake 0.4s ease-in-out;
   }
 

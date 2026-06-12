@@ -406,6 +406,7 @@ export default function QuizContainer() {
               onClick={() => {
                 setSelectedType('matching');
                 setShowCustomConfig(false);
+                setQuestionCount(prev => (prev < 4 || prev > 20) ? 8 : prev);
               }}
             >
               <div className="quiz-type-icon">
@@ -420,6 +421,7 @@ export default function QuizContainer() {
               onClick={() => {
                 setSelectedType('matching-en');
                 setShowCustomConfig(false);
+                setQuestionCount(prev => (prev < 4 || prev > 20) ? 8 : prev);
               }}
             >
               <div className="quiz-type-icon">
@@ -447,21 +449,93 @@ export default function QuizContainer() {
           {/* Quiz Options */}
           <div className="quiz-options-container">
             <div className="quiz-option-group">
-              <label className="quiz-select-label" style={{ marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <ListOrdered size={14} /> Số lượng câu hỏi:
-              </label>
-              <div className="quiz-options-buttons">
-                {[5, 10, 20, 9999].map((count) => (
-                  <button
-                    key={count}
-                    type="button"
-                    className={`quiz-opt-btn ${questionCount === count ? 'active' : ''}`}
-                    onClick={() => setQuestionCount(count)}
-                  >
-                    {count === 9999 ? 'Tất cả' : count}
-                  </button>
-                ))}
-              </div>
+              {selectedType.startsWith('matching') ? (
+                <>
+                  <label className="quiz-select-label" style={{ marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ListOrdered size={14} /> Số từ ghép (4 - 20 từ):
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setQuestionCount(prev => Math.max(4, prev - 1))}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '50%',
+                        border: '1px solid var(--color-border-default)',
+                        background: 'var(--color-bg-tertiary)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '1.1rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                    >-</button>
+                    <input
+                      type="range"
+                      min="4"
+                      max={selectedSetId ? Math.max(4, Math.min(20, (vocabSets.find(s => s._id === selectedSetId)?.wordCount || 20))) : 20}
+                      value={questionCount < 4 || questionCount > 20 ? 8 : questionCount}
+                      onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                      style={{ 
+                        flex: 1, 
+                        accentColor: 'var(--color-accent-primary)',
+                        cursor: 'pointer',
+                        height: '6px',
+                        borderRadius: '3px',
+                        background: 'rgba(255,255,255,0.1)'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuestionCount(prev => Math.min(selectedSetId ? Math.min(20, (vocabSets.find(s => s._id === selectedSetId)?.wordCount || 20)) : 20, prev + 1))}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '50%',
+                        border: '1px solid var(--color-border-default)',
+                        background: 'var(--color-bg-tertiary)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '1.1rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                    >+</button>
+                    <span style={{ 
+                      fontSize: '0.95rem', 
+                      fontWeight: '800', 
+                      color: 'var(--color-accent-primary)',
+                      minWidth: '2.8rem',
+                      textAlign: 'right'
+                    }}>
+                      {questionCount < 4 || questionCount > 20 ? 8 : questionCount} từ
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label className="quiz-select-label" style={{ marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ListOrdered size={14} /> Số lượng câu hỏi:
+                  </label>
+                  <div className="quiz-options-buttons">
+                    {[5, 10, 20, 9999].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        className={`quiz-opt-btn ${questionCount === count ? 'active' : ''}`}
+                        onClick={() => setQuestionCount(count)}
+                      >
+                        {count === 9999 ? 'Tất cả' : count}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="quiz-option-group">

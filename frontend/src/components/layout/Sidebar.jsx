@@ -1,5 +1,5 @@
 import './Sidebar.css';
-import { BookOpen, Brain, Headphones, TrendingUp, GraduationCap, LogIn, LogOut, User, X, Layers } from 'lucide-react';
+import { BookOpen, Brain, Headphones, TrendingUp, GraduationCap, LogIn, LogOut, User, X, Layers, Gamepad2 } from 'lucide-react';
 import useAppStore from '../../store/useAppStore';
 import useAuthStore from '../../store/useAuthStore';
 import { useState } from 'react';
@@ -11,6 +11,7 @@ const navItems = [
   { id: 'flashcard', label: 'Flashcard', icon: Layers, description: 'Định nghĩa & Từ vựng' },
   { id: 'quiz', label: 'Kiểm tra', icon: Brain, description: 'Trắc nghiệm & Điền từ' },
   { id: 'listening', label: 'Luyện nghe', icon: Headphones, description: 'Nghe & hoàn thành câu' },
+  { id: 'games', label: 'Giải trí', icon: Gamepad2, description: 'Học qua trò chơi' },
   { id: 'progress', label: 'Tiến độ', icon: TrendingUp, description: 'Lịch sử học tập' },
 ];
 
