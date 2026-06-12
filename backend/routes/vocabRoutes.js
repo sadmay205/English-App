@@ -12,6 +12,9 @@ const {
   deleteVocabulary,
   generateDefinitions,
   updateVocabulary,
+  mergeSets,
+  splitSet,
+  updateSet,
 } = require('../controllers/vocabController');
 
 // Configure multer for PDF upload (store in memory)
@@ -51,10 +54,19 @@ router.post('/upload-pdf', upload.single('pdf'), uploadPdf);
 // DELETE /api/vocabulary/sets/:id — Delete a vocabulary set
 router.delete('/sets/:id', deleteSet);
 
+// PUT /api/vocabulary/sets/:id — Update a vocabulary set
+router.put('/sets/:id', updateSet);
+
 // DELETE /api/vocabulary/item/:id — Delete a single vocabulary word
 router.delete('/item/:id', deleteVocabulary);
 
 // PUT /api/vocabulary/item/:id — Update a single vocabulary word
 router.put('/item/:id', updateVocabulary);
+
+// POST /api/vocabulary/merge — Merge two vocabulary sets
+router.post('/merge', mergeSets);
+
+// POST /api/vocabulary/split — Split selected words from a set into a new set
+router.post('/split', splitSet);
 
 module.exports = router;

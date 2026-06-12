@@ -80,11 +80,17 @@ export default function CustomQuizRunner() {
   // Initialize matching cards in Phase 2
   useEffect(() => {
     if (currentPhase === 'matching' && matchingQuestions.length > 0) {
-      const eng = matchingQuestions.map(q => ({ id: q.id, text: q.word, type: 'english' }));
+      const eng = matchingQuestions.map(q => ({
+        id: q.id,
+        uniqueId: `${q.id}-${q.type}`,
+        text: q.word,
+        type: 'english'
+      }));
       const rightSide = matchingQuestions.map(q => {
         const isEnDef = q.type === 'matching-en';
         return {
           id: q.id,
+          uniqueId: `${q.id}-${q.type}`,
           text: isEnDef ? q.englishDefinition : q.meaningVi,
           type: isEnDef ? 'english-def' : 'vietnamese'
         };
@@ -92,7 +98,7 @@ export default function CustomQuizRunner() {
       setEnglishCards(shuffle(eng));
       setVietnameseCards(shuffle(rightSide));
     }
-  }, [currentPhase, matchingQuestions]);
+  }, [currentPhase, questions]);
 
   // General Countdown Timer
   useEffect(() => {
@@ -216,14 +222,14 @@ export default function CustomQuizRunner() {
 
   // Phase 2 (Matching Card Click)
   const handleCardClick = (card) => {
-    if (matchedIds.has(card.id) || failedIds.has(card.id)) return;
+    if (matchedIds.has(card.uniqueId) || failedIds.has(card.uniqueId)) return;
 
     if (!selectedCard) {
       setSelectedCard(card);
       return;
     }
 
-    if (selectedCard.id === card.id && selectedCard.type === card.type) {
+    if (selectedCard.uniqueId === card.uniqueId && selectedCard.type === card.type) {
       setSelectedCard(null);
       return;
     }
@@ -235,10 +241,10 @@ export default function CustomQuizRunner() {
 
     setAttempts(prev => prev + 1);
 
-    if (selectedCard.id === card.id) {
+    if (selectedCard.uniqueId === card.uniqueId) {
       // Match success
       const newMatched = new Set(matchedIds);
-      newMatched.add(card.id);
+      newMatched.add(card.uniqueId);
       setMatchedIds(newMatched);
       setSelectedCard(null);
 
@@ -254,7 +260,7 @@ export default function CustomQuizRunner() {
       }
     } else {
       // Match failed
-      const pair = [selectedCard.id, card.id];
+      const pair = [selectedCard.uniqueId, card.uniqueId];
       setFailedIds(new Set(pair));
       setSelectedCard(null);
 
@@ -515,9 +521,9 @@ export default function CustomQuizRunner() {
               <h4 className="column-title">English</h4>
               <div className="cards-stack">
                 {englishCards.map((card) => {
-                  const isMatched = matchedIds.has(card.id);
-                  const isSelected = selectedCard?.id === card.id && selectedCard?.type === 'english';
-                  const isFailed = failedIds.has(card.id);
+                  const isMatched = matchedIds.has(card.uniqueId);
+                  const isSelected = selectedCard?.uniqueId === card.uniqueId && selectedCard?.type === 'english';
+                  const isFailed = failedIds.has(card.uniqueId);
 
                   let cardClass = "match-card";
                   if (isMatched) cardClass += " matched";
@@ -526,7 +532,7 @@ export default function CustomQuizRunner() {
 
                   return (
                     <button
-                      key={`eng-${card.id}`}
+                      key={`eng-${card.uniqueId}`}
                       className={cardClass}
                       onClick={() => handleCardClick(card)}
                       disabled={isMatched}
@@ -544,9 +550,9 @@ export default function CustomQuizRunner() {
               <h4 className="column-title">Nghĩa tiếng Việt / Anh</h4>
               <div className="cards-stack">
                 {vietnameseCards.map((card) => {
-                  const isMatched = matchedIds.has(card.id);
-                  const isSelected = selectedCard?.id === card.id && selectedCard?.type === card.type;
-                  const isFailed = failedIds.has(card.id);
+                  const isMatched = matchedIds.has(card.uniqueId);
+                  const isSelected = selectedCard?.uniqueId === card.uniqueId && selectedCard?.type === card.type;
+                  const isFailed = failedIds.has(card.uniqueId);
 
                   let cardClass = "match-card";
                   if (isMatched) cardClass += " matched";
@@ -555,7 +561,7 @@ export default function CustomQuizRunner() {
 
                   return (
                     <button
-                      key={`vie-${card.id}`}
+                      key={`vie-${card.uniqueId}`}
                       className={cardClass}
                       onClick={() => handleCardClick(card)}
                       disabled={isMatched}

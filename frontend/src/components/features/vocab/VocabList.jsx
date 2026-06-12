@@ -6,7 +6,7 @@ import api from '../../../services/api';
 import { toast } from 'sonner';
 
 export default function VocabList({ vocabSetId }) {
-  const { vocabularies, addWord, deleteWord, updateWord } = useVocabStore();
+  const { vocabularies, addWord, deleteWord, updateWord, splitSet } = useVocabStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPdfImport, setShowPdfImport] = useState(false);
   const [newWord, setNewWord] = useState('');
@@ -16,6 +16,46 @@ export default function VocabList({ vocabSetId }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, word }
   const [isTranslating, setIsTranslating] = useState(false);
+
+  // Split vocabulary states
+  const [isSplitMode, setIsSplitMode] = useState(false);
+  const [selectedWordIds, setSelectedWordIds] = useState([]);
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [newSetTitle, setNewSetTitle] = useState('');
+  const [newSetDescription, setNewSetDescription] = useState('');
+  const [isSplitting, setIsSplitting] = useState(false);
+
+  const toggleWordSelect = (wordId) => {
+    setSelectedWordIds((prev) =>
+      prev.includes(wordId) ? prev.filter((id) => id !== wordId) : [...prev, wordId]
+    );
+  };
+
+  const handleSplitSubmit = async () => {
+    if (!newSetTitle.trim()) {
+      toast.error('Vui lòng nhập tên bộ từ vựng mới!');
+      return;
+    }
+    if (selectedWordIds.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một từ vựng để tách!');
+      return;
+    }
+
+    setIsSplitting(true);
+    const result = await splitSet(vocabSetId, selectedWordIds, newSetTitle.trim(), newSetDescription.trim());
+    setIsSplitting(false);
+
+    if (result) {
+      toast.success(`Đã tách thành công ${selectedWordIds.length} từ vựng sang bộ từ "${result.newSet.title}"!`);
+      setNewSetTitle('');
+      setNewSetDescription('');
+      setSelectedWordIds([]);
+      setIsSplitMode(false);
+      setShowSplitModal(false);
+    } else {
+      toast.error('Lỗi khi tách bộ từ vựng.');
+    }
+  };
 
   // Edit vocabulary states
   const [editingWord, setEditingWord] = useState(null);
@@ -205,6 +245,24 @@ Example output format:
               id="vocab-search"
             />
           </div>
+          {!isSplitMode && vocabularies.length > 0 && (
+            <button
+              onClick={() => {
+                setIsSplitMode(true);
+                setSelectedWordIds([]);
+                setShowAddForm(false);
+                setShowPdfImport(false);
+              }}
+              className="btn-ghost"
+              style={{ 
+                padding: '0.5rem 0.875rem', 
+                fontSize: '0.8rem', 
+                marginRight: '0.25rem',
+              }}
+            >
+              Tách bộ từ
+            </button>
+          )}
           <button
             onClick={() => {
               setShowPdfImport(!showPdfImport);
@@ -241,6 +299,35 @@ Example output format:
           </button>
         </div>
       </div>
+
+      {/* Split Mode Toolbar */}
+      {isSplitMode && (
+        <div className="vocab-add-form card animate-scale-in" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderColor: 'var(--color-accent-primary)', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>
+            Đã chọn <strong style={{ color: 'var(--color-accent-primary)' }}>{selectedWordIds.length}</strong> từ vựng để tách
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => setShowSplitModal(true)}
+              className="btn-primary"
+              disabled={selectedWordIds.length === 0}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+            >
+              Tách sang bộ mới
+            </button>
+            <button
+              onClick={() => {
+                setIsSplitMode(false);
+                setSelectedWordIds([]);
+              }}
+              className="btn-ghost"
+              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* PDF Import Zone */}
       {showPdfImport && (
@@ -341,9 +428,46 @@ Example output format:
             <div
               key={vocab._id}
               className="vocab-word-item animate-fade-in"
-              style={{ animationDelay: `${Math.min(index * 0.02, 0.5)}s` }}
+              onClick={() => {
+                if (isSplitMode) {
+                  toggleWordSelect(vocab._id);
+                }
+              }}
+              style={{ 
+                animationDelay: `${Math.min(index * 0.02, 0.5)}s`,
+                cursor: isSplitMode ? 'pointer' : 'default',
+                borderColor: isSplitMode && selectedWordIds.includes(vocab._id) ? 'var(--color-accent-primary)' : '',
+                background: isSplitMode && selectedWordIds.includes(vocab._id) ? 'var(--color-accent-glow)' : ''
+              }}
             >
-              <div className="vocab-word-number">{index + 1}</div>
+              {isSplitMode ? (
+                <div 
+                  onClick={(e) => { e.stopPropagation(); toggleWordSelect(vocab._id); }}
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedWordIds.includes(vocab._id)}
+                    onChange={() => toggleWordSelect(vocab._id)}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      accentColor: 'var(--color-accent-primary)',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="vocab-word-number">{index + 1}</div>
+              )}
               <div className="vocab-word-content">
                 <div className="vocab-word-english" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.375rem' }}>
                   <span className="vocab-word-text">{vocab.word}</span>
@@ -352,7 +476,7 @@ Example output format:
                   )}
                   <button
                     className="vocab-word-speak-inline"
-                    onClick={() => handleSpeak(vocab.word)}
+                    onClick={(e) => { e.stopPropagation(); handleSpeak(vocab.word); }}
                     title="Phát âm"
                   >
                     <Volume2 size={13} />
@@ -368,46 +492,52 @@ Example output format:
                     <span style={{ fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#b45309', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                       <AlertCircle size={10} /> Thiếu định nghĩa Anh
                     </span>
-                    <button 
-                      onClick={() => handleGenerateSingleDefinition(vocab)}
-                      disabled={generatingSingleId !== null}
-                      className="btn-ghost"
-                      style={{ fontSize: '0.65rem', padding: '1px 6px', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px', borderColor: 'var(--color-accent-primary)', color: 'var(--color-accent-primary)', background: 'var(--color-accent-glow)', cursor: 'pointer' }}
-                    >
-                      {generatingSingleId === vocab._id ? 'Đang tạo...' : '✨ Tạo nhanh bằng AI'}
-                    </button>
+                    {!isSplitMode && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleGenerateSingleDefinition(vocab); }}
+                        disabled={generatingSingleId !== null}
+                        className="btn-ghost"
+                        style={{ fontSize: '0.65rem', padding: '1px 6px', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '2px', borderColor: 'var(--color-accent-primary)', color: 'var(--color-accent-primary)', background: 'var(--color-accent-glow)', cursor: 'pointer' }}
+                      >
+                        {generatingSingleId === vocab._id ? 'Đang tạo...' : '✨ Tạo nhanh bằng AI'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
-              <button
-                className="vocab-word-edit"
-                onClick={() => startEdit(vocab)}
-                title="Chỉnh sửa từ"
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid transparent',
-                  background: 'transparent',
-                  color: 'var(--color-text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s ease',
-                  marginRight: '0.25rem',
-                  flexShrink: 0
-                }}
-              >
-                <Edit3 size={14} />
-              </button>
-              <button
-                className="vocab-word-delete"
-                onClick={() => setDeleteConfirm({ id: vocab._id, word: vocab.word })}
-                title="Xóa từ"
-              >
-                <Trash2 size={14} />
-              </button>
+              {!isSplitMode && (
+                <>
+                  <button
+                    className="vocab-word-edit"
+                    onClick={(e) => { e.stopPropagation(); startEdit(vocab); }}
+                    title="Chỉnh sửa từ"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid transparent',
+                      background: 'transparent',
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                      marginRight: '0.25rem',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    className="vocab-word-delete"
+                    onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: vocab._id, word: vocab.word }); }}
+                    title="Xóa từ"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              )}
             </div>
 
           ))}
@@ -484,6 +614,56 @@ Example output format:
             <div className="custom-confirm-actions" style={{ marginTop: '1.5rem', justifyContent: 'flex-end', display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => setEditingWord(null)} className="btn-ghost-confirm">Hủy</button>
               <button onClick={handleSaveEdit} className="btn-danger-confirm" style={{ background: 'var(--color-accent-primary)' }}>Lưu thay đổi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Split Modal */}
+      {showSplitModal && (
+        <div className="custom-confirm-overlay animate-fade-in" style={{ zIndex: 1002 }}>
+          <div className="custom-confirm-card animate-scale-in" style={{ maxWidth: '450px', textAlign: 'left' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.25rem' }}>📚 Tách bộ từ vựng mới</h3>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
+              Bạn đang tách <strong>{selectedWordIds.length}</strong> từ vựng sang một bộ mới.
+            </p>
+            
+            <div className="vocab-edit-fields" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Tên bộ từ mới *</label>
+                <input
+                  type="text"
+                  value={newSetTitle}
+                  onChange={(e) => setNewSetTitle(e.target.value)}
+                  placeholder="Ví dụ: Từ vựng IELTS nâng cao"
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              
+              <div className="vocab-add-field">
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Mô tả (tùy chọn)</label>
+                <input
+                  type="text"
+                  value={newSetDescription}
+                  onChange={(e) => setNewSetDescription(e.target.value)}
+                  placeholder="Mô tả về bộ từ vựng mới này"
+                  className="input"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div className="custom-confirm-actions" style={{ marginTop: '1.5rem', justifyContent: 'flex-end', display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => setShowSplitModal(false)} className="btn-ghost-confirm">Hủy</button>
+              <button
+                onClick={handleSplitSubmit}
+                className="btn-danger-confirm"
+                disabled={!newSetTitle.trim() || isSplitting}
+                style={{ background: 'var(--color-accent-primary)' }}
+              >
+                {isSplitting ? 'Đang tách...' : 'Xác nhận tách'}
+              </button>
             </div>
           </div>
         </div>

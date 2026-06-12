@@ -372,6 +372,131 @@ const updateVocabulary = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Merge two vocabulary sets (move all words from source set to target set and delete source set)
+ * @route   POST /api/vocabulary/merge
+ */
+const mergeSets = async (req, res, next) => {
+  try {
+    const { sourceSetId, targetSetId } = req.body;
+
+    if (!sourceSetId || !targetSetId) {
+      res.status(400);
+      throw new Error('Cần cung cấp sourceSetId và targetSetId');
+    }
+
+    if (sourceSetId === targetSetId) {
+      res.status(400);
+      throw new Error('Bộ nguồn và bộ đích phải khác nhau');
+    }
+
+    // Verify both sets belong to current user
+    const sourceSet = await VocabSet.findOne({ _id: sourceSetId, user: req.user._id });
+    const targetSet = await VocabSet.findOne({ _id: targetSetId, user: req.user._id });
+
+    if (!sourceSet || !targetSet) {
+      res.status(404);
+      throw new Error('Không tìm thấy một hoặc cả hai bộ từ vựng');
+    }
+
+    // Move all vocabulary items from source to target
+    await Vocabulary.updateMany(
+      { vocabSet: sourceSetId },
+      { vocabSet: targetSetId }
+    );
+
+    // Update target set lastStudiedAt
+    targetSet.lastStudiedAt = new Date();
+    await targetSet.save();
+
+    // Delete the source set
+    await VocabSet.findByIdAndDelete(sourceSetId);
+
+    res.json({
+      message: 'Gộp bộ từ vựng thành công',
+      sourceSetId,
+      targetSetId,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Split selected words from a set into a new set
+ * @route   POST /api/vocabulary/split
+ */
+const splitSet = async (req, res, next) => {
+  try {
+    const { sourceSetId, wordIds, newSetTitle, newSetDescription } = req.body;
+
+    if (!sourceSetId || !wordIds || !Array.isArray(wordIds) || wordIds.length === 0 || !newSetTitle) {
+      res.status(400);
+      throw new Error('Cần cung cấp sourceSetId, danh sách wordIds và newSetTitle');
+    }
+
+    // Verify source set belongs to current user
+    const sourceSet = await VocabSet.findOne({ _id: sourceSetId, user: req.user._id });
+    if (!sourceSet) {
+      res.status(404);
+      throw new Error('Không tìm thấy bộ từ vựng nguồn');
+    }
+
+    // Create the new set
+    const newSet = await VocabSet.create({
+      user: req.user._id,
+      title: newSetTitle.trim(),
+      description: newSetDescription ? newSetDescription.trim() : '',
+    });
+
+    // Update the vocabSet reference for the selected words
+    // Also ensure the words actually belong to the source set
+    const updateResult = await Vocabulary.updateMany(
+      { _id: { $in: wordIds }, vocabSet: sourceSetId },
+      { vocabSet: newSet._id }
+    );
+
+    // Update lastStudiedAt for both sets
+    sourceSet.lastStudiedAt = new Date();
+    await sourceSet.save();
+
+    res.status(201).json({
+      message: 'Tách bộ từ vựng thành công',
+      newSet: { ...newSet.toObject(), wordCount: updateResult.modifiedCount },
+      sourceSetId,
+      splitCount: updateResult.modifiedCount,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update a vocabulary set (title/description)
+ * @route   PUT /api/vocabulary/sets/:id
+ */
+const updateSet = async (req, res, next) => {
+  try {
+    const { title, description } = req.body;
+
+    const set = await VocabSet.findOne({ _id: req.params.id, user: req.user._id });
+
+    if (!set) {
+      res.status(404);
+      throw new Error('Không tìm thấy bộ từ vựng');
+    }
+
+    if (title !== undefined) set.title = title.trim();
+    if (description !== undefined) set.description = description.trim();
+
+    const updated = await set.save();
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllSets,
   createSet,
@@ -382,4 +507,7 @@ module.exports = {
   deleteVocabulary,
   generateDefinitions,
   updateVocabulary,
+  mergeSets,
+  splitSet,
+  updateSet,
 };

@@ -171,6 +171,101 @@ const useVocabStore = create((set, get) => ({
     }
   },
 
+  // Merge two sets
+  mergeSets: async (sourceSetId, targetSetId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('/vocabulary/merge', { sourceSetId, targetSetId });
+      
+      set((state) => {
+        const sourceSet = state.vocabSets.find((s) => s._id === sourceSetId);
+        const sourceCount = sourceSet ? (sourceSet.wordCount || 0) : 0;
+        
+        return {
+          vocabSets: state.vocabSets
+            .filter((s) => s._id !== sourceSetId)
+            .map((s) =>
+              s._id === targetSetId
+                ? { ...s, wordCount: (s.wordCount || 0) + sourceCount, lastStudiedAt: new Date().toISOString() }
+                : s
+            ),
+          isLoading: false,
+        };
+      });
+      return data;
+    } catch (error) {
+      set({
+        error: error.response?.data?.message || 'Lỗi khi gộp bộ từ vựng',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
+  // Split selected words into a new set
+  splitSet: async (sourceSetId, wordIds, newSetTitle, newSetDescription) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post('/vocabulary/split', {
+        sourceSetId,
+        wordIds,
+        newSetTitle,
+        newSetDescription,
+      });
+      
+      set((state) => {
+        const updatedVocabularies = state.vocabularies.filter((v) => !wordIds.includes(v._id));
+        const updatedVocabSets = state.vocabSets.map((s) =>
+          s._id === sourceSetId
+            ? { ...s, wordCount: Math.max(0, (s.wordCount || 0) - data.splitCount), lastStudiedAt: new Date().toISOString() }
+            : s
+        );
+        
+        const newSetWithDate = {
+          ...data.newSet,
+          lastStudiedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        };
+
+        return {
+          vocabSets: [newSetWithDate, ...updatedVocabSets],
+          vocabularies: updatedVocabularies,
+          currentSet: state.currentSet?._id === sourceSetId
+            ? { ...state.currentSet, wordCount: updatedVocabularies.length }
+            : state.currentSet,
+          isLoading: false,
+        };
+      });
+      return data;
+    } catch (error) {
+      set({
+        error: error.response?.data?.message || 'Lỗi khi tách bộ từ vựng',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
+  // Update a vocabulary set
+  updateSet: async (id, title, description) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.put(`/vocabulary/sets/${id}`, { title, description });
+      set((state) => ({
+        vocabSets: state.vocabSets.map((s) => (s._id === id ? { ...s, title: data.title, description: data.description } : s)),
+        currentSet: state.currentSet?._id === id ? { ...state.currentSet, title: data.title, description: data.description } : state.currentSet,
+        isLoading: false,
+      }));
+      return data;
+    } catch (error) {
+      set({
+        error: error.response?.data?.message || 'Lỗi khi cập nhật bộ từ vựng',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
   // Clear current set
   clearCurrentSet: () => set({ currentSet: null, vocabularies: [] }),
 }));

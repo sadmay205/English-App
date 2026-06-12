@@ -20,12 +20,25 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// Response interceptor for error handling + auto-logout on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || error.message || 'Đã xảy ra lỗi';
     console.error('API Error:', message);
+
+    // Auto-logout when token is expired or invalid
+    if (error.response?.status === 401) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Dynamically import to avoid circular dependency issues
+        import('../store/useAuthStore').then(({ default: useAuthStore }) => {
+          useAuthStore.getState().logout();
+        });
+        console.warn('Phiên đăng nhập hết hạn, đã tự động đăng xuất.');
+      }
+    }
+
     return Promise.reject(error);
   }
 );

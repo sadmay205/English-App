@@ -1,14 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderOpen, Clock, BookOpen, Trash2, ArrowRight } from 'lucide-react';
+import { Plus, FolderOpen, Clock, BookOpen, Trash2, ArrowRight, Edit3 } from 'lucide-react';
 import useVocabStore from '../../../store/useVocabStore';
 import VocabList from './VocabList';
 import { toast } from 'sonner';
 
 export default function VocabSetCreator() {
-  const { vocabSets, currentSet, isLoading, fetchSets, createSet, fetchSetById, deleteSet, clearCurrentSet } = useVocabStore();
+  const { vocabSets, currentSet, isLoading, fetchSets, createSet, fetchSetById, deleteSet, clearCurrentSet, mergeSets, updateSet } = useVocabStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showMergeForm, setShowMergeForm] = useState(false);
+  const [sourceMergeId, setSourceMergeId] = useState('');
+  const [targetMergeId, setTargetMergeId] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
+
+  // Edit vocabulary set states
+  const [setToEdit, setSetToEdit] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [isUpdatingSet, setIsUpdatingSet] = useState(false);
 
   useEffect(() => {
     fetchSets();
@@ -53,6 +63,56 @@ export default function VocabSetCreator() {
     setSetToDelete(null);
   };
 
+  const handleEditClick = (e, setObj) => {
+    e.stopPropagation();
+    setSetToEdit(setObj);
+    setEditTitle(setObj.title);
+    setEditDesc(setObj.description || '');
+  };
+
+  const handleSaveSetEdit = async () => {
+    if (!editTitle.trim()) {
+      toast.error('Tên bộ từ vựng là bắt buộc!');
+      return;
+    }
+    setIsUpdatingSet(true);
+    const result = await updateSet(setToEdit._id, editTitle.trim(), editDesc.trim());
+    setIsUpdatingSet(false);
+    if (result) {
+      toast.success('Đã cập nhật bộ từ vựng thành công!');
+      setSetToEdit(null);
+    } else {
+      toast.error('Lỗi khi cập nhật bộ từ vựng.');
+    }
+  };
+
+  const handleMerge = async () => {
+    if (!sourceMergeId || !targetMergeId) {
+      toast.error('Vui lòng chọn đầy đủ bộ từ vựng nguồn và bộ đích!');
+      return;
+    }
+    if (sourceMergeId === targetMergeId) {
+      toast.error('Bộ từ vựng nguồn và bộ đích không được trùng nhau!');
+      return;
+    }
+
+    const sourceSet = vocabSets.find((s) => s._id === sourceMergeId);
+    const targetSet = vocabSets.find((s) => s._id === targetMergeId);
+
+    setIsMerging(true);
+    const result = await mergeSets(sourceMergeId, targetMergeId);
+    setIsMerging(false);
+
+    if (result) {
+      toast.success(`Đã gộp thành công bộ "${sourceSet?.title}" vào bộ "${targetSet?.title}"!`);
+      setSourceMergeId('');
+      setTargetMergeId('');
+      setShowMergeForm(false);
+    } else {
+      toast.error('Lỗi khi gộp bộ từ vựng.');
+    }
+  };
+
   // If a set is selected, show its details
   if (currentSet) {
     return (
@@ -90,15 +150,77 @@ export default function VocabSetCreator() {
           <h2 className="vocab-main-title">📚 Bộ Từ Vựng</h2>
           <p className="vocab-subtitle">Quản lý và học các bộ từ vựng của bạn</p>
         </div>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="btn-primary"
-          id="create-set-btn"
-        >
-          <Plus size={18} />
-          Tạo bộ mới
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => { setShowMergeForm(!showMergeForm); setShowCreateForm(false); }}
+            className="btn-ghost"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.625rem 1rem' }}
+          >
+            Gộp bộ từ
+          </button>
+          <button
+            onClick={() => { setShowCreateForm(!showCreateForm); setShowMergeForm(false); }}
+            className="btn-primary"
+            id="create-set-btn"
+          >
+            <Plus size={18} />
+            Tạo bộ mới
+          </button>
+        </div>
       </div>
+
+      {/* Merge Form */}
+      {showMergeForm && (
+        <div className="vocab-create-form card animate-scale-in" style={{ borderColor: 'var(--color-accent-primary)' }}>
+          <h3>Gộp hai bộ từ vựng</h3>
+          <p className="vocab-form-help-text" style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+            Lưu ý: Toàn bộ từ vựng của <strong>Bộ nguồn</strong> sẽ được chuyển sang <strong>Bộ đích</strong>. Bộ nguồn sẽ bị xóa sau khi gộp thành công.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <div className="vocab-form-group" style={{ flex: 1, minWidth: '200px' }}>
+              <label>Bộ nguồn (Sẽ bị xóa) *</label>
+              <select
+                value={sourceMergeId}
+                onChange={(e) => setSourceMergeId(e.target.value)}
+                className="input"
+                style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="">-- Chọn bộ nguồn --</option>
+                {vocabSets.map((set) => (
+                  <option key={set._id} value={set._id}>{set.title} ({set.wordCount || 0} từ)</option>
+                ))}
+              </select>
+            </div>
+            <div className="vocab-form-group" style={{ flex: 1, minWidth: '200px' }}>
+              <label>Bộ đích (Nhận từ vựng) *</label>
+              <select
+                value={targetMergeId}
+                onChange={(e) => setTargetMergeId(e.target.value)}
+                className="input"
+                style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="">-- Chọn bộ đích --</option>
+                {vocabSets.map((set) => (
+                  <option key={set._id} value={set._id}>{set.title} ({set.wordCount || 0} từ)</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="vocab-form-actions">
+            <button
+              onClick={handleMerge}
+              className="btn-primary"
+              disabled={!sourceMergeId || !targetMergeId || sourceMergeId === targetMergeId || isMerging}
+              style={{ background: 'linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary))' }}
+            >
+              {isMerging ? 'Đang gộp...' : 'Xác nhận Gộp'}
+            </button>
+            <button onClick={() => setShowMergeForm(false)} className="btn-ghost">
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create Form */}
       {showCreateForm && (
@@ -163,13 +285,22 @@ export default function VocabSetCreator() {
                 <div className="vocab-set-icon">
                   <BookOpen size={20} />
                 </div>
-                <button
-                  className="vocab-set-delete"
-                  onClick={(e) => handleDeleteClick(e, set)}
-                  title="Xóa bộ từ vựng"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  <button
+                    className="vocab-set-edit"
+                    onClick={(e) => handleEditClick(e, set)}
+                    title="Sửa bộ từ vựng"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    className="vocab-set-delete"
+                    onClick={(e) => handleDeleteClick(e, set)}
+                    title="Xóa bộ từ vựng"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
               <h3 className="vocab-set-title">{set.title}</h3>
               {set.description && (
@@ -207,6 +338,43 @@ export default function VocabSetCreator() {
               </button>
               <button onClick={handleConfirmDelete} className="btn-primary confirm-delete-btn">
                 Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Edit Set Modal */}
+      {setToEdit && (
+        <div className="confirm-modal-overlay" style={{ zIndex: 1001 }}>
+          <div className="confirm-modal-card animate-scale-in" style={{ textAlign: 'left', maxWidth: '450px' }}>
+            <h3 className="confirm-modal-title" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>✏️ Chỉnh sửa bộ từ vựng</h3>
+            <div className="vocab-form-group">
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '0.375rem' }}>Tên bộ từ vựng *</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="input"
+                style={{ width: '100%', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+              />
+            </div>
+            <div className="vocab-form-group" style={{ marginTop: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '0.375rem' }}>Mô tả</label>
+              <input
+                type="text"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                className="input"
+                style={{ width: '100%', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+              />
+            </div>
+            <div className="confirm-modal-actions" style={{ marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+              <button onClick={() => setSetToEdit(null)} className="btn-ghost">
+                Hủy bỏ
+              </button>
+              <button onClick={handleSaveSetEdit} className="btn-primary" disabled={!editTitle.trim() || isUpdatingSet}>
+                {isUpdatingSet ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
             </div>
           </div>
@@ -316,7 +484,23 @@ const creatorStyles = `
     opacity: 0;
   }
 
-  .vocab-set-card:hover .vocab-set-delete {
+  .vocab-set-edit {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0;
+  }
+
+  .vocab-set-card:hover .vocab-set-delete,
+  .vocab-set-card:hover .vocab-set-edit {
     opacity: 1;
   }
 
@@ -324,6 +508,12 @@ const creatorStyles = `
     background: var(--color-error-bg);
     color: var(--color-error);
     border-color: var(--color-error);
+  }
+
+  .vocab-set-edit:hover {
+    background: var(--color-accent-glow);
+    color: var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
   }
 
   .vocab-set-title {
@@ -363,17 +553,23 @@ const creatorStyles = `
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-accent-secondary);
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border-default);
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-accent-primary);
+    padding: 0.5rem 1rem;
+    background: var(--color-accent-glow);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--radius-md);
+    margin-top: 0.75rem;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .vocab-set-card:hover .vocab-set-action {
-    opacity: 1;
+    background: var(--gradient-accent);
+    color: white;
+    border-color: transparent;
+    box-shadow: var(--shadow-button);
+    transform: scale(1.02);
   }
 
   .vocab-loading, .vocab-empty {
