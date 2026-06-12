@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
@@ -20,6 +21,15 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Rate limiting — chống brute-force tấn công
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 20,                   // tối đa 20 lần thử mỗi 15 phút
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.' },
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -30,7 +40,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/auth', authLimiter, require('./routes/authRoutes'));
 app.use('/api/vocabulary', require('./routes/vocabRoutes'));
 app.use('/api/quiz', require('./routes/quizRoutes'));
 app.use('/api/listening', require('./routes/listeningRoutes'));

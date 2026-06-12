@@ -1,5 +1,7 @@
-const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'english-learning-app-secret-key-2026';
 
 const protect = async (req, res, next) => {
   let token;
@@ -7,39 +9,13 @@ const protect = async (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        res.status(401);
-        throw new Error('Định dạng Token không hợp lệ');
-      }
 
-      const [header, payload, signature] = parts;
-      const secret = process.env.JWT_SECRET || 'english-learning-app-secret-key-2026';
-      
-      // Calculate signature to verify
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(`${header}.${payload}`)
-        .digest('base64url');
+      // Verify token using jsonwebtoken — handles signature + expiration automatically
+      const decoded = jwt.verify(token, JWT_SECRET);
 
-      if (signature !== expectedSignature) {
-        res.status(401);
-        throw new Error('Chữ ký Token không hợp lệ');
-      }
-
-      // Parse payload
-      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-      
-      // Check expiration
-      if (decoded.exp < Math.floor(Date.now() / 1000)) {
-        res.status(401);
-        throw new Error('Token đăng nhập đã hết hạn');
-      }
-
-      // Attach user to request
+      // Attach user to request (exclude password field)
       req.user = await User.findById(decoded.id).select('-password');
-      
+
       if (!req.user) {
         res.status(401);
         throw new Error('Không tìm thấy tài khoản người dùng tương ứng với Token');
@@ -48,7 +24,14 @@ const protect = async (req, res, next) => {
       next();
     } catch (error) {
       res.status(401);
-      next(error.message ? error : new Error('Không được phân quyền truy cập, token không hợp lệ'));
+      // Map jsonwebtoken error types to Vietnamese messages
+      const message =
+        error.name === 'TokenExpiredError'
+          ? 'Token đăng nhập đã hết hạn'
+          : error.name === 'JsonWebTokenError'
+          ? 'Token không hợp lệ'
+          : error.message || 'Không được phân quyền truy cập, token không hợp lệ';
+      next(new Error(message));
     }
   } else {
     res.status(401);

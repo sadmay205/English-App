@@ -1,31 +1,12 @@
-const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Helper to hash password using SHA256
-const hashPassword = (password) => {
-  return crypto.createHash('sha256').update(password).digest('hex');
-};
+const JWT_SECRET = process.env.JWT_SECRET || 'english-learning-app-secret-key-2026';
 
-// Helper to generate a lightweight manual JWT token
+// Helper to generate JWT using jsonwebtoken library
 const generateToken = (userId) => {
-  const secret = process.env.JWT_SECRET || 'english-learning-app-secret-key-2026';
-  
-  // Header: HS256 algorithm
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  
-  // Payload: Expires in 30 days
-  const payload = Buffer.from(JSON.stringify({
-    id: userId,
-    exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
-  })).toString('base64url');
-  
-  // Signature
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${header}.${payload}`)
-    .digest('base64url');
-    
-  return `${header}.${payload}.${signature}`;
+  return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '30d' });
 };
 
 /**
@@ -48,21 +29,21 @@ const registerUser = async (req, res, next) => {
       throw new Error('Tên đăng nhập hoặc email đã tồn tại');
     }
 
-    // Hash password
-    const hashedPassword = hashPassword(password);
+    // Hash password with bcrypt (salt rounds = 12)
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // Create user
     const user = await User.create({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
     res.status(201).json({
       _id: user._id,
       username: user.username,
       email: user.email,
-      token: generateToken(user._id)
+      token: generateToken(user._id),
     });
   } catch (error) {
     next(error);
@@ -82,23 +63,21 @@ const loginUser = async (req, res, next) => {
       throw new Error('Vui lòng điền tên đăng nhập/email và mật khẩu');
     }
 
-    // Hash the input password to match database format
-    const hashedPassword = hashPassword(password);
-
     // Find user by username or email
     const user = await User.findOne({
       $or: [
         { email: emailOrUsername.toLowerCase() },
-        { username: emailOrUsername }
-      ]
+        { username: emailOrUsername },
+      ],
     });
 
-    if (user && user.password === hashedPassword) {
+    // Use bcrypt.compare for timing-safe comparison
+    if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
         _id: user._id,
         username: user.username,
         email: user.email,
-        token: generateToken(user._id)
+        token: generateToken(user._id),
       });
     } else {
       res.status(401);
@@ -111,5 +90,5 @@ const loginUser = async (req, res, next) => {
 
 module.exports = {
   registerUser,
-  loginUser
+  loginUser,
 };
